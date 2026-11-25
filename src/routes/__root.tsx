@@ -7,12 +7,13 @@ import {
   HeadContent,
   Outlet,
   Scripts,
+  useLocation,
   type ErrorComponentProps,
 } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { ThemeProvider } from 'next-themes';
 
-import { envConfigs } from '@/config';
+import { defaultAppLogo, envConfigs } from '@/config';
 import {
   APPEARANCE_CONFIG_KEYS,
   APPEARANCE_ENABLED_KEY,
@@ -28,7 +29,7 @@ import {
 } from '@/config/appearance';
 import { parseCookieConsent } from '@/lib/cookie-consent';
 import { getQueryClient } from '@/lib/query-client';
-import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
+import { getLocale } from '@/paraglide/runtime.js';
 import { useAppearance } from '@/hooks/use-appearance';
 import { useCookieConsent } from '@/hooks/use-cookie-consent';
 import { CookieConsent } from '@/blocks/cookie-consent';
@@ -41,13 +42,12 @@ import { GoogleOneTap } from '@/components/google-one-tap';
 import { SandboxPreviewBridge } from '@/components/sandbox-preview-bridge';
 import { Toaster } from '@/components/ui/sonner';
 
-import '@fontsource-variable/inter';
-import '@fontsource-variable/nunito';
-import '@fontsource-variable/source-serif-4';
-import '@fontsource/libre-baskerville/400.css';
-import '@fontsource/libre-baskerville/700.css';
-import '@fontsource/libre-baskerville/400-italic.css';
+import '@fontsource/instrument-serif/latin-400.css';
+import '@fontsource/libre-baskerville/latin-400.css';
+import '@fontsource/libre-baskerville/latin-700.css';
+import '@fontsource/libre-baskerville/latin-400-italic.css';
 import '@/styles/globals.css';
+import '@/styles/magi.css';
 
 // Analytics IDs live in the DB config (1h-cached service). Fetched via a
 // server function so drizzle/db code never reaches the client bundle.
@@ -127,30 +127,21 @@ const getAnalyticsConfigs = createServerFn().handler(async () => {
 export const Route = createRootRoute({
   loader: () => getAnalyticsConfigs(),
   head: () => {
-    // head() runs on the SSR server AND again on the client during hydration.
-    // On the client, app_url falls back to the localhost dev default when
-    // VITE_APP_URL wasn't inlined into the client bundle at build — which would
-    // emit a second, localhost set of hreflang links. Prefer the live origin
-    // on the client so it always matches; the server uses the configured URL.
-    const appUrl =
-      (typeof window !== 'undefined' && window.location?.origin) ||
-      envConfigs.app_url ||
-      '';
     return {
       meta: [
         { charSet: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { title: envConfigs.app_name },
         { name: 'description', content: envConfigs.app_description },
+        { name: 'theme-color', content: '#17120e' },
       ],
       links: [
-        { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
-        { rel: 'apple-touch-icon', href: '/favicon.svg' },
-        ...locales.map((loc) => ({
-          rel: 'alternate',
-          hrefLang: loc,
-          href: localizeUrl(`${appUrl}/`, { locale: loc }).href,
-        })),
+        { rel: 'icon', href: defaultAppLogo, type: 'image/png' },
+        {
+          rel: 'apple-touch-icon',
+          href: defaultAppLogo,
+          sizes: '180x180',
+        },
       ],
     };
   },
@@ -161,6 +152,10 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const showDevtools = useLocation({
+    select: ({ pathname }) =>
+      pathname.startsWith('/settings') || pathname.startsWith('/admin'),
+  });
   const analytics = Route.useLoaderData();
   const consentEnabled = !!analytics?.cookieConsentEnabled;
   const consent = useCookieConsent(analytics?.cookieConsent ?? null);
@@ -183,11 +178,7 @@ function RootComponent() {
           allowed={!consentEnabled || consent === 'accepted'}
         />
         <SandboxPreviewBridge />
-        {/* Appearance on: toasts follow the theme (globals.css). */}
-        <Toaster
-          position="top-center"
-          richColors={!analytics?.appearanceEnabled}
-        />
+        <Toaster position="top-center" />
         <GoogleOneTap />
         {analytics?.gaId ? (
           <GoogleAnalytics
@@ -213,7 +204,9 @@ function RootComponent() {
           <CookieConsent initial={analytics?.cookieConsent ?? null} />
         ) : null}
       </ThemeProvider>
-      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+      {import.meta.env.DEV && showDevtools && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
     </QueryClientProvider>
   );
 }

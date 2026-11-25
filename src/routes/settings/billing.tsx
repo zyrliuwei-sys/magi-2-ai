@@ -271,7 +271,7 @@ function BillingPage() {
           <div className="flex items-center justify-between">
             <CardTitle>{m['settings.billing.subscription']()}</CardTitle>
             <Link
-              href="/pricing"
+              href="/pricing?billing=monthly"
               className={cn(
                 buttonVariants({ variant: 'outline', size: 'sm' }),
                 'gap-2'
@@ -354,7 +354,7 @@ function BillingPage() {
             pageSize={PAGE_SIZE}
             onPageChange={setPage}
             rowKey={(r) => r.id}
-            emptyText={m['settings.billing.no_subscription']()}
+            emptyText={m['settings.billing.no_subscriptions_found']()}
             search={search}
             onSearchChange={setSearch}
             onRefresh={async () => {

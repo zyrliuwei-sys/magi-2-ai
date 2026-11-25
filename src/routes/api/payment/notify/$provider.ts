@@ -36,15 +36,18 @@ export const Route = createFileRoute('/api/payment/notify/$provider')({
           console.log(`Payment event [${provider}]: ${event.eventType}`);
 
           return ackSuccess(provider);
-        } catch (error: any) {
+        } catch (error) {
           // Authentic event we don't process — ack it so the provider stops
           // redelivering. Not a failure.
           if (isWebhookIgnored(error)) {
-            console.log(`Webhook ignored [${provider}]: ${error.message}`);
+            console.log(`Webhook ignored [${provider}]`);
             return ackSuccess(provider);
           }
 
-          console.error('webhook error:', error);
+          console.error(
+            'webhook error:',
+            error instanceof Error ? error.name : 'Unknown error'
+          );
 
           // Real failure: answer non-2xx so the provider retries. Returning
           // 200 here makes Stripe/Creem/PayPal mark the delivery as succeeded,
@@ -59,12 +62,12 @@ export const Route = createFileRoute('/api/payment/notify/$provider')({
 
           if (provider === 'wechat') {
             return Response.json(
-              { code: 'FAIL', message: error.message || 'Webhook failed' },
+              { code: 'FAIL', message: 'Webhook failed' },
               { status: 500 }
             );
           }
 
-          return respErr(error.message || 'Webhook handling failed', {
+          return respErr('Webhook handling failed', {
             status: 500,
           });
         }

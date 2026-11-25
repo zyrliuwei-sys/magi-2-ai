@@ -1,38 +1,35 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { m } from '@/paraglide/messages.js';
-import { getLocale } from '@/paraglide/runtime.js';
-import { Footer } from '@/blocks/footer';
-import { Header } from '@/blocks/header';
-import { Pricing } from '@/blocks/pricing';
-
-export const Route = createFileRoute('/pricing')({
-  loader: () => {
-    const locale = getLocale();
-    return {
-      title: m['landing.pricing.title']({}, { locale }),
-      description: m['landing.pricing.description']({}, { locale }),
-    };
-  },
-  head: ({ loaderData }) => ({
-    meta: loaderData
-      ? [
-          { title: loaderData.title },
-          { name: 'description', content: loaderData.description },
-        ]
-      : [],
-  }),
-  component: PricingPage,
-});
+import { MagiInsight } from '@/blocks/magi-editorial';
+import { MagiPricing } from '@/blocks/magi-pricing';
+import { magiHead, MagiIntro, MagiSite } from '@/blocks/magi-site';
 
 function PricingPage() {
+  const { billing } = Route.useSearch();
   return (
-    <div className="bg-background text-foreground flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1">
-        <Pricing />
-      </main>
-      <Footer />
-    </div>
+    <MagiSite>
+      <div className="magi-wrap">
+        <MagiIntro
+          title={m['video.page.pricing.title']()}
+          description={m['video.page.pricing.description']()}
+        />
+        <MagiPricing key={billing} initialBilling={billing} />
+        <MagiInsight page="pricing" />
+      </div>
+    </MagiSite>
   );
 }
+
+export const Route = createFileRoute('/pricing')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    billing: search.billing === 'monthly' ? ('monthly' as const) : undefined,
+  }),
+  head: () =>
+    magiHead(
+      '/pricing',
+      m['video.page.pricing.seo_title'](),
+      m['video.page.pricing.seo_description']()
+    ),
+  component: PricingPage,
+});

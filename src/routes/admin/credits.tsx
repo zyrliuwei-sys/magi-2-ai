@@ -88,7 +88,7 @@ function CreditsPage() {
         <span
           className={cn(
             'font-medium',
-            c.credits > 0 ? 'text-green-600' : 'text-red-500'
+            c.credits > 0 ? 'text-primary' : 'text-red-500'
           )}
         >
           {c.credits > 0 ? `+${c.credits}` : c.credits}

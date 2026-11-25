@@ -33,10 +33,10 @@ interface TimelinePage {
   nextCursor: string | null;
 }
 
-// Dot colour: green = money in, red = failures and money out, amber = the
+// Dot colour: primary = money in, red = failures and money out, amber = the
 // user moving toward paying, grey = everything else.
 const TONE_CLASSES: Record<EventTone, string> = {
-  green: 'bg-emerald-500',
+  positive: 'bg-primary',
   red: 'bg-red-500',
   amber: 'bg-amber-500',
   gray: 'bg-muted-foreground/50',
@@ -55,8 +55,8 @@ function labelOf(kind: string) {
 }
 
 const TONES: Record<string, string> = {
-  order_paid: 'bg-emerald-500',
-  subscription_started: 'bg-emerald-500',
+  order_paid: 'bg-primary',
+  subscription_started: 'bg-primary',
   order_failed: 'bg-red-500',
   order_refunded: 'bg-red-500',
   subscription_canceled: 'bg-red-500',

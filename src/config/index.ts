@@ -13,14 +13,21 @@ const procEnv: Record<string, string | undefined> =
 
 const publicEnv = (key: string) => metaEnv[key] ?? procEnv[key];
 
+export const defaultAppLogo = '/imgs/magi/logo-3d.png';
+const configuredLogo = publicEnv('VITE_APP_LOGO')?.trim();
+
 export const envConfigs: Record<string, string> = {
   // App (public)
   app_url: publicEnv('VITE_APP_URL') ?? 'http://localhost:3000',
-  app_name: publicEnv('VITE_APP_NAME') ?? 'My App',
+  app_name: publicEnv('VITE_APP_NAME') ?? 'magi2 ai',
   app_description:
     publicEnv('VITE_APP_DESCRIPTION') ??
-    'Your workspace for projects and tools.',
-  app_logo: publicEnv('VITE_APP_LOGO') ?? '/logo.svg',
+    'Turn text and images into short videos with sound.',
+  app_logo:
+    configuredLogo && configuredLogo !== '/logo.svg'
+      ? configuredLogo
+      : defaultAppLogo,
+  support_email: 'support@magi2.me',
 
   // Database
   database_url: procEnv.DATABASE_URL ?? '',
@@ -80,6 +87,7 @@ export const envConfigs: Record<string, string> = {
   // OPENAI_API_KEY / ANTHROPIC_API_KEY are common ambient vars, and falling back
   // to them would let the admin "Test" silently pass on the machine's own key.
   replicate_api_token: procEnv.REPLICATE_API_TOKEN ?? '',
+  higgsfield_api_key: procEnv.HF_API_KEY ?? '',
 
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',

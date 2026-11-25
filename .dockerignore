@@ -8,13 +8,13 @@ build
 src/routeTree.gen.ts
 src/paraglide
 
-# env files — .env.production is created by CI and needed at build time
-# so Vite can inline VITE_* into the client bundle.
+# Build-time environment is passed through the BuildKit build_env mount.
 .env
-.env.local
-.env.development
+.env.*
 !.env.example
-!.env.production
+.npmrc
+.netrc
+.pypirc
 
 # local database
 data
@@ -43,4 +43,8 @@ LICENSE
 .DS_Store
 *.log
 *.pem
+*.key
+*.sqlite
+*.sqlite3
+*.db
 *.tsbuildinfo

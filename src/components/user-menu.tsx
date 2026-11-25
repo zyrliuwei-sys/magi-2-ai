@@ -11,10 +11,10 @@ import {
   UserIcon,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { toast } from 'sonner';
 
 import { signOut } from '@/core/auth/client';
 import { tDynamic } from '@/core/i18n/dynamic';
-import { useRouter } from '@/core/i18n/navigation';
 import { THEMES } from '@/config/appearance';
 import { localeNames } from '@/config/locale';
 import { m } from '@/paraglide/messages.js';
@@ -57,7 +57,6 @@ export function UserMenu({
   image?: string | null;
   profileHref?: string;
 }) {
-  const router = useRouter();
   const locale = getLocale();
   const { theme, setTheme } = useTheme();
   const {
@@ -72,8 +71,15 @@ export function UserMenu({
   const { isMobile } = useSidebar();
 
   async function handleSignOut() {
-    await signOut();
-    router.push('/');
+    try {
+      const result = await signOut();
+      if (!result.error) {
+        // Leave the protected layout and its expired session in one navigation.
+        window.location.replace(localizeHref('/'));
+        return;
+      }
+    } catch {}
+    toast.error(m['common.sign.sign_out_failed']());
   }
 
   function handleLocaleSwitch(newLocale: string) {

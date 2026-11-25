@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { requestPasswordReset } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import { privatePageHead } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
@@ -16,7 +17,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import { Field, FieldDescription, FieldGroup } from '@/components/ui/field';
 
@@ -32,7 +32,6 @@ function ForgotPasswordPage() {
   const configQuery = usePublicConfig();
   const configs = configQuery.data ?? {};
 
-  const configsLoaded = configQuery.isSuccess;
   const passwordResetEnabled = configs.password_reset_enabled === 'true';
 
   const form = useForm({
@@ -67,19 +66,29 @@ function ForgotPasswordPage() {
         </Link>
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">
+            <h1
+              data-slot="card-title"
+              className="text-xl leading-snug font-medium"
+            >
               {sent
                 ? m['common.sign.reset_link_sent_title']()
                 : m['common.sign.forgot_password_title']()}
-            </CardTitle>
-            {!sent && (
+            </h1>
+            {!sent && passwordResetEnabled && (
               <CardDescription>
                 {m['common.sign.forgot_password_description']()}
               </CardDescription>
             )}
           </CardHeader>
           <CardContent>
-            {configsLoaded && !passwordResetEnabled ? (
+            {configQuery.isPending ? (
+              <p
+                className="text-muted-foreground text-center text-sm"
+                role="status"
+              >
+                {m['common.sign.checking_password_reset']()}
+              </p>
+            ) : !passwordResetEnabled ? (
               <FieldGroup>
                 <div className="rounded-lg border border-dashed p-6 text-center">
                   <p className="text-sm font-medium">
@@ -168,5 +177,10 @@ function ForgotPasswordPage() {
 }
 
 export const Route = createFileRoute('/(auth)/forgot-password')({
+  head: () =>
+    privatePageHead(
+      m['common.sign.forgot_password_title'](),
+      m['common.sign.forgot_password_description']()
+    ),
   component: ForgotPasswordPage,
 });

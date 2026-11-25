@@ -335,7 +335,7 @@ function DashboardPage() {
                 !subscriptionQuery.isPending &&
                 !subscription && (
                   <Link
-                    href="/pricing"
+                    href="/pricing?billing=monthly"
                     className={buttonVariants({
                       variant: 'outline',
                       size: 'xs',

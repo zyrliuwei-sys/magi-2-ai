@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
-import { readdir, readFile } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { SiteFooter } from '../src/components/site-footer';
+import {
+  magiExamples,
+  magiGuideClips,
+  magiReferences,
+  magiStudioClips,
+} from '../src/config/magi-content';
 
 test('published interface copy and downloadable admin instructions contain no upstream promotion', async () => {
   const messages = JSON.parse(
@@ -49,4 +55,27 @@ test('the footer renders the configured product copy without vendor badges or li
   );
   assert.match(html, /Example App/);
   assert.doesNotMatch(html, /ship\s?any|Built with/i);
+});
+
+test('each public video collection has unique clips and all local media is present', async () => {
+  const studios = ['home', 'text', 'image'] as const;
+  const collections = [
+    ...Object.values(magiStudioClips).map((group) =>
+      group.map(({ video }) => video)
+    ),
+    ...studios.map((studio) =>
+      magiReferences(studio).map(({ video }) => video)
+    ),
+    magiExamples.map(({ video }) => video),
+    Object.values(magiGuideClips).map(({ url }) => url),
+  ];
+
+  // A clip can illustrate a technique in a guide as well as appear in a reel.
+  for (const group of collections)
+    assert.equal(new Set(group).size, group.length);
+  await Promise.all(
+    [...new Set(collections.flat())]
+      .filter((clip) => clip.startsWith('/'))
+      .map((clip) => access(new URL(`../public${clip}`, import.meta.url)))
+  );
 });

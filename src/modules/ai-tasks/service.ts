@@ -1,9 +1,9 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { db } from '@/core/db';
-import { atomic, AtomicGuardError } from '@/core/db/atomic';
+import { atomic, AtomicGuardError, guard } from '@/core/db/atomic';
 import { aiTask } from '@/config/db/schema';
-import { planConsume, revoke } from '@/modules/credits/service';
+import { planConsume, planRevoke } from '@/modules/credits/service';
 import { getUuid } from '@/lib/hash';
 
 export enum AITaskStatus {
@@ -18,25 +18,27 @@ export enum AITaskStatus {
  * Create an AI task with optional credit consumption.
  */
 export async function createTask(params: {
+  id?: string;
   userId: string;
   mediaType: string;
   provider: string;
   model: string;
   prompt: string;
   costCredits?: number;
-  options?: any;
-}): Promise<any> {
+  options?: unknown;
+}): Promise<typeof aiTask.$inferSelect> {
   const { userId, mediaType, provider, model, prompt, costCredits, options } =
     params;
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const taskData: typeof aiTask.$inferInsert = {
-      id: getUuid(),
+      id: params.id ?? getUuid(),
       userId,
       mediaType,
       provider,
       model,
       prompt,
+      options: options === undefined ? undefined : JSON.stringify(options),
       status: AITaskStatus.PENDING,
       costCredits: costCredits || 0,
     };
@@ -56,6 +58,7 @@ export async function createTask(params: {
     if (plan === null) throw new Error('Insufficient credits');
     if (plan) {
       // Stored for revocation if the task fails.
+      taskData.creditId = plan.consumedCredit.id;
       taskData.taskInfo = JSON.stringify({
         creditId: plan.consumedCredit.id,
       });
@@ -82,43 +85,61 @@ export async function createTask(params: {
   throw new Error('Insufficient credits');
 }
 
-/**
- * Update task status. Revokes credits on failure.
- */
+/** Move a live task forward and restore its charge in the same batch on failure. */
 export async function updateTask(params: {
   taskId: string;
   status: AITaskStatus;
-  taskResult?: any;
+  providerTaskId?: string;
+  onlyIfUnsubmitted?: boolean;
+  taskResult?: unknown;
 }) {
-  const { taskId, status, taskResult } = params;
-
-  const [task] = await db()
-    .select()
-    .from(aiTask)
-    .where(eq(aiTask.id, taskId))
-    .limit(1);
-
+  const { taskId, status, providerTaskId, onlyIfUnsubmitted, taskResult } =
+    params;
+  const task = await findTask(taskId);
   if (!task) throw new Error('Task not found');
+  const pending = task.status === AITaskStatus.PENDING;
+  if (!pending && task.status !== AITaskStatus.PROCESSING) return task;
 
-  // Update task
-  const updateData: any = { status };
-  if (taskResult) {
-    updateData.taskResult = JSON.stringify(taskResult);
-  }
-
-  await db().update(aiTask).set(updateData).where(eq(aiTask.id, taskId));
-
-  // Revoke credits on failure
-  if (status === AITaskStatus.FAILED && task.taskInfo) {
+  const terminalFailure =
+    status === AITaskStatus.FAILED || status === AITaskStatus.CANCELED;
+  let creditId = task.creditId;
+  if (terminalFailure && !creditId && task.taskInfo) {
     try {
-      const info = JSON.parse(task.taskInfo as string);
-      if (info.creditId) {
-        await revoke(info.creditId);
-      }
+      creditId = JSON.parse(task.taskInfo).creditId;
     } catch {
-      // Ignore parse errors
+      // Older records can have provider metadata instead of a credit ID.
     }
   }
+  const restore =
+    terminalFailure && creditId ? await planRevoke(creditId) : undefined;
+  const allowed =
+    providerTaskId || onlyIfUnsubmitted
+      ? and(eq(aiTask.status, AITaskStatus.PENDING), isNull(aiTask.taskId))!
+      : inArray(aiTask.status, [AITaskStatus.PENDING, AITaskStatus.PROCESSING]);
+  try {
+    await atomic((q) => [
+      guard({
+        table: aiTask,
+        column: 'userId',
+        where: eq(aiTask.id, taskId),
+        require: allowed,
+        message: 'Task status changed',
+      }),
+      q
+        .update(aiTask)
+        .set({
+          status,
+          taskId: providerTaskId,
+          taskResult:
+            taskResult === undefined ? undefined : JSON.stringify(taskResult),
+        })
+        .where(eq(aiTask.id, taskId)),
+      ...(restore ? restore(q) : []),
+    ]);
+  } catch (error) {
+    if (!(error instanceof AtomicGuardError)) throw error;
+  }
+  return findTask(taskId);
 }
 
 /**
@@ -127,11 +148,12 @@ export async function updateTask(params: {
 export async function getTasks(params: {
   userId: string;
   mediaType?: string;
+  provider?: string | string[];
   status?: string;
   page?: number;
   limit?: number;
 }) {
-  const { userId, mediaType, status, page = 1, limit = 20 } = params;
+  const { userId, mediaType, provider, status, page = 1, limit = 20 } = params;
 
   return db()
     .select()
@@ -140,6 +162,11 @@ export async function getTasks(params: {
       and(
         eq(aiTask.userId, userId),
         mediaType ? eq(aiTask.mediaType, mediaType) : undefined,
+        Array.isArray(provider)
+          ? inArray(aiTask.provider, provider)
+          : provider
+            ? eq(aiTask.provider, provider)
+            : undefined,
         status ? eq(aiTask.status, status) : undefined,
         isNull(aiTask.deletedAt)
       )
@@ -149,14 +176,41 @@ export async function getTasks(params: {
     .offset((page - 1) * limit);
 }
 
+/** Let one reader retry a pending upstream submission for this task version. */
+export async function claimTaskSubmission(taskId: string, updatedAt: Date) {
+  try {
+    await atomic((q) => [
+      guard({
+        table: aiTask,
+        column: 'userId',
+        where: eq(aiTask.id, taskId),
+        require: and(
+          eq(aiTask.status, AITaskStatus.PENDING),
+          isNull(aiTask.taskId),
+          eq(aiTask.updatedAt, updatedAt)
+        )!,
+        message: 'Task submission already claimed',
+      }),
+      q
+        .update(aiTask)
+        .set({ updatedAt: new Date() })
+        .where(eq(aiTask.id, taskId)),
+    ]);
+    return true;
+  } catch (error) {
+    if (error instanceof AtomicGuardError) return false;
+    throw error;
+  }
+}
+
 /**
  * Find task by ID.
  */
 export async function findTask(taskId: string) {
-  const [result] = await db()
+  const [result] = (await db()
     .select()
     .from(aiTask)
     .where(eq(aiTask.id, taskId))
-    .limit(1);
+    .limit(1)) as (typeof aiTask.$inferSelect)[];
   return result;
 }

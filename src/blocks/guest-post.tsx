@@ -27,7 +27,11 @@ export function GuestPostLanding() {
           </p>
         </div>
 
-        {!isPending && !info?.enabled ? (
+        {isPending ? (
+          <p className="text-muted-foreground mt-12 text-center" role="status">
+            {m['guest_posts.loading']()}
+          </p>
+        ) : !info?.enabled ? (
           <p className="text-muted-foreground mt-12 text-center">
             {m['guest_posts.closed']()}
           </p>

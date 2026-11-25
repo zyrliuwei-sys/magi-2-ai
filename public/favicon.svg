@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Favicon">
-  <rect width="512" height="512" rx="96" fill="#0a0a0a"/>
-  <rect x="128" y="128" width="112" height="256" rx="28" fill="#ffffff"/>
-  <rect x="272" y="128" width="112" height="112" rx="28" fill="#ffffff"/>
-  <rect x="272" y="272" width="112" height="112" rx="28" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="11" fill="#17120e"/>
+  <path d="M21 10H10v11m33-11h11v11M10 43v11h11m33-11v11H43" fill="none" stroke="#c29a61" stroke-width="3" stroke-linecap="square"/>
+  <path fill="#f2d6a3" d="M17 44V21h5.5l9.5 11 9.5-11H47v23h-5.5V30l-9.5 10.6L22.5 30v14z"/>
 </svg>

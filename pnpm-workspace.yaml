@@ -1,3 +1,10 @@
 allowBuilds:
   esbuild: false
   workerd: false
+
+overrides:
+  seroval: 1.6.11
+  seroval-plugins: 1.6.11
+  next: '-'
+  '@esbuild-kit/core-utils>esbuild': 0.25.12
+  '@ts-morph/common>minimatch': 11.0.1

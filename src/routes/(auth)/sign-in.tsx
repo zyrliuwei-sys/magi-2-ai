@@ -6,13 +6,18 @@ import { z } from 'zod';
 import { authClient, signIn, useSession } from '@/core/auth/client';
 import { Link, useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
-import { resolveAfterAuthUrl, safeInternalPath } from '@/lib/redirect';
+import {
+  parseAuthEntrySearch,
+  resolveAfterAuthUrl,
+  safeInternalPath,
+} from '@/lib/redirect';
+import { privatePageHead } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
 import { TextField } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
   Field,
   FieldDescription,
@@ -37,24 +42,7 @@ function SignInPage() {
   // callbackUrl: internal page path, goes there directly after login.
   // redirect: either an internal path (same thing) or an app protocol URL like
   // `myapp://auth/callback`, which detours through /auth-callback for a token.
-  const [redirectParam, setRedirectParam] = useState<string | null>(null);
-  const [callbackUrl, setCallbackUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setRedirectParam(params.get('redirect'));
-    setCallbackUrl(params.get('callbackUrl'));
-  }, []);
-
-  // Already signed in (visited /sign-in directly, or a stale callbackUrl looped
-  // back here) → go home. The auth pages never gate themselves, so this can't loop.
-  useEffect(() => {
-    if (sessionPending || navigatingRef.current) return;
-    if (session?.user) {
-      navigatingRef.current = true;
-      router.push('/');
-    }
-  }, [sessionPending, session?.user, router]);
+  const { redirect: redirectParam, callbackUrl } = Route.useSearch();
 
   // Allow only same-site relative paths, and never an auth page (would loop).
   const safeCallbackUrl = safeInternalPath(callbackUrl);
@@ -64,6 +52,12 @@ function SignInPage() {
     callbackUrl,
     fallback: '/settings',
   });
+
+  useEffect(() => {
+    if (sessionPending || navigatingRef.current || !session?.user) return;
+    navigatingRef.current = true;
+    router.replace(afterLoginUrl);
+  }, [sessionPending, session?.user, router, afterLoginUrl]);
 
   // Carry callbackUrl/redirect across to sign-up so the destination survives the switch.
   const switchQuery = (() => {
@@ -139,9 +133,12 @@ function SignInPage() {
         </Link>
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">
+            <h1
+              data-slot="card-title"
+              className="text-xl leading-snug font-medium"
+            >
               {m['common.sign.sign_in_title']()}
-            </CardTitle>
+            </h1>
           </CardHeader>
           <CardContent>
             {configsLoaded && !hasAnyMethod ? (
@@ -314,5 +311,11 @@ function SignInPage() {
 }
 
 export const Route = createFileRoute('/(auth)/sign-in')({
+  validateSearch: parseAuthEntrySearch,
+  head: () =>
+    privatePageHead(
+      m['common.sign.sign_in_title'](),
+      m['common.sign.sign_in_description']()
+    ),
   component: SignInPage,
 });

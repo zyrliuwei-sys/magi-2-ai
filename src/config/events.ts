@@ -5,7 +5,7 @@
  * `users_timeline`) next to orders, credits and tasks.
  *
  * Register every kind here before using it:
- * - `tone`: timeline dot — green (money in), red (failure / risk), amber (the
+ * - `tone`: timeline dot — positive (money in), red (failure / risk), amber (the
  *   user moving toward paying), gray (default).
  * - `client: true` lets the browser report it with `track()` from
  *   `@/lib/track`. Leave it off for anything the user must not be able to
@@ -18,7 +18,7 @@
  * This file is imported by the browser bundle: no server imports here.
  */
 
-export type EventTone = 'green' | 'red' | 'amber' | 'gray';
+export type EventTone = 'positive' | 'red' | 'amber' | 'gray';
 
 export interface EventDefinition {
   tone?: EventTone;

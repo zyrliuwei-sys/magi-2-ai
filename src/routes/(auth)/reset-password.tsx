@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { resetPassword } from '@/core/auth/client';
 import { Link, useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import { privatePageHead } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { TextField } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import { Field, FieldDescription, FieldGroup } from '@/components/ui/field';
 
@@ -77,9 +77,12 @@ function ResetPasswordPage() {
         </Link>
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">
+            <h1
+              data-slot="card-title"
+              className="text-xl leading-snug font-medium"
+            >
               {m['common.sign.reset_password_title']()}
-            </CardTitle>
+            </h1>
             {!success && tokenChecked && token && (
               <CardDescription>
                 {m['common.sign.reset_password_description']()}
@@ -87,7 +90,14 @@ function ResetPasswordPage() {
             )}
           </CardHeader>
           <CardContent>
-            {!tokenChecked ? null : !token ? (
+            {!tokenChecked ? (
+              <p
+                className="text-muted-foreground text-center text-sm"
+                role="status"
+              >
+                {m['common.sign.checking_reset_link']()}
+              </p>
+            ) : !token ? (
               <FieldGroup>
                 <div className="bg-destructive/10 text-destructive rounded-lg p-3 text-center text-sm">
                   {m['common.sign.reset_password_invalid_token']()}
@@ -184,5 +194,10 @@ function ResetPasswordPage() {
 }
 
 export const Route = createFileRoute('/(auth)/reset-password')({
+  head: () =>
+    privatePageHead(
+      m['common.sign.reset_password_title'](),
+      m['common.sign.reset_password_description']()
+    ),
   component: ResetPasswordPage,
 });

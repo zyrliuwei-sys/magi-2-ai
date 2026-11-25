@@ -26,8 +26,29 @@ function ensureCloudflareEnv(): Promise<void> {
         (globalThis as any).__CF_ENV__ = mod.env;
         ensureDefaultUserAgent();
       })
-      .catch(() => {
-        // Not running on Cloudflare Workers — nothing to stash.
+      .catch(async () => {
+        if (!import.meta.env.DEV || envConfigs.database_provider !== 'd1') {
+          return;
+        }
+
+        const globals = globalThis as typeof globalThis & {
+          __CF_ENV__?: Record<string, unknown>;
+        };
+        if (globals.__CF_ENV__?.DB) return;
+
+        // Vite runs in Node by default. Wrangler forwards remote bindings
+        // from the same configuration used for the Worker deployment.
+        const { getPlatformProxy } = await import('wrangler');
+        const { env } = await getPlatformProxy({
+          configPath: 'wrangler.jsonc',
+          envFiles: [],
+          persist: false,
+        });
+        globals.__CF_ENV__ = env;
+      })
+      .catch((error) => {
+        cfEnvPromise = null;
+        throw error;
       });
   }
   return cfEnvPromise;
@@ -74,15 +95,18 @@ function appHost(): string {
 
 // Redirects and fetched responses may have immutable headers. Copy those
 // before applying first-party attribution cookies below.
-function withMutableHeaders(response: Response): Response {
+function withSecurityHeaders(response: Response): Response {
+  let result = response;
   try {
-    response.headers.delete('X-Powered-By');
-    return response;
+    result.headers.delete('X-Powered-By');
   } catch {
-    const copy = new Response(response.body, response);
-    copy.headers.delete('X-Powered-By');
-    return copy;
+    result = new Response(response.body, response);
+    result.headers.delete('X-Powered-By');
   }
+  result.headers.set('X-Content-Type-Options', 'nosniff');
+  if (!result.headers.has('Referrer-Policy'))
+    result.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  return result;
 }
 
 // Custom server entry — wraps every request in a db scope (one db client per
@@ -91,7 +115,7 @@ function withMutableHeaders(response: Response): Response {
 export default {
   async fetch(req: Request): Promise<Response> {
     const redirect = redirectChineseEdition(req);
-    if (redirect) return withMutableHeaders(redirect);
+    if (redirect) return withSecurityHeaders(redirect);
     await ensureCloudflareEnv();
     // Wrap the whole request so anything before/after the handler shares
     // the same db client too.
@@ -100,12 +124,52 @@ export default {
 };
 
 async function handleRequest(req: Request): Promise<Response> {
-  const response = withMutableHeaders(
+  const url = new URL(req.url);
+  const api = /^\/api(?:\/|$)/.test(url.pathname);
+  const origin = req.headers.get('origin');
+  if (
+    api &&
+    !/^\/api\/(?:auth(?:\/|$)|payment\/notify\/)/.test(url.pathname) &&
+    !['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
+    (origin
+      ? origin !== url.origin
+      : req.headers.get('sec-fetch-site') === 'cross-site')
+  ) {
+    return withSecurityHeaders(
+      Response.json(
+        { code: -1, message: 'Same-origin request required' },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } }
+      )
+    );
+  }
+  const response = withSecurityHeaders(
     await paraglideMiddleware(req, () => handler.fetch(req))
   );
+  const guestPreview =
+    url.pathname.startsWith('/blog/') &&
+    ['1', 'true'].includes(url.searchParams.get('preview') ?? '');
+  const privatePage =
+    /^\/(?:admin|settings)(?:\/|$)/.test(url.pathname) ||
+    /^\/(?:sign-in|sign-up|forgot-password|reset-password|verify-email|redeem-invite|auth-callback)\/?$/.test(
+      url.pathname
+    ) ||
+    guestPreview;
+  if (api || privatePage)
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  const privateApi =
+    /^\/api\/(?:admin|auth|apikeys|credits|user|tickets|videos)(?:\/|$)/.test(
+      url.pathname
+    );
+  if (privatePage || privateApi)
+    response.headers.set('Cache-Control', 'private, no-store');
+  if (privatePage) {
+    response.headers.set('X-Frame-Options', 'DENY');
+  }
+  if (/^\/(?:auth-callback|reset-password|verify-email)\/?$/.test(url.pathname))
+    response.headers.set('Referrer-Policy', 'no-referrer');
   // First-touch attribution: remember UTM params for 30 days so sign-up can
   // stamp them onto the user row. Never overwrite an existing cookie.
-  const params = new URL(req.url).searchParams;
+  const params = url.searchParams;
   const cookieHeader = req.headers.get('cookie');
   for (const key of UTM_COOKIE_KEYS) {
     const value = params.get(key);
@@ -127,10 +191,7 @@ async function handleRequest(req: Request): Promise<Response> {
     (req.headers.get('accept') || '').includes('text/html') &&
     !getCookieFromHeader(cookieHeader, REFERRER_COOKIE)
   ) {
-    const sanitized = sanitizeReferrer(referer, [
-      new URL(req.url).host,
-      appHost(),
-    ]);
+    const sanitized = sanitizeReferrer(referer, [url.host, appHost()]);
     if (sanitized) {
       response.headers.append(
         'Set-Cookie',

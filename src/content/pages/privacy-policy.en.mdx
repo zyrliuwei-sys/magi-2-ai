@@ -1,12 +1,14 @@
+import { envConfigs } from '../../config/index';
+
 export const meta = {
   title: 'Privacy Policy',
-  description: 'How we collect, use, and protect your personal information.',
-  updated_at: '2026-05-21',
+  description: `How ${envConfigs.app_name} handles your personal information and the content you submit to generate videos.`,
+  updated_at: '2026-11-25',
 };
 
 ## Introduction
 
-We respect your privacy and are committed to protecting your personal data. This Privacy Policy explains how we collect, use, and safeguard your information when you use our service.
+This Privacy Policy explains how {envConfigs.app_name} collects, uses, and protects your information when you use the short video generator.
 
 ## Information We Collect
 
@@ -17,6 +19,10 @@ We collect the following types of information to provide and improve our service
 3. **Device Information** — Device type, operating system, and browser type, used to optimize compatibility and performance.
 4. **Cookies** — Small data files stored on your device to remember preferences and improve your experience.
 5. **Payment Information** — Billing details handled by trusted third-party payment processors. We do not store full card numbers on our servers.
+
+## Video Generation Data
+
+When you request a video, we send your text prompt and generation settings to SeeAPI for processing. If you upload a starting image, we store it with our file storage provider and share its link with SeeAPI for the render. Your video history stores your prompt, settings, job status, and a link to the finished video. The generation provider hosts finished videos under its own retention terms.
 
 ## How We Use Your Information
 
@@ -42,7 +48,7 @@ We implement industry-standard security measures including encryption in transit
 
 ## Your Rights
 
-You have the right to access, update, export, or delete your personal information. You can do this through your account settings or by contacting us at the email address below.
+You have the right to access, update, export, or delete your personal information. You can update your profile in account settings or send a request using the contact address below.
 
 ## Changes to This Policy
 
@@ -50,4 +56,4 @@ We may update this Privacy Policy from time to time. We will notify you of any m
 
 ## Contact Us
 
-If you have questions about this Privacy Policy, please contact us at the email address provided on our website.
+For privacy questions or requests, email{' '}<a className="text-primary font-medium underline underline-offset-4" href={`mailto:${envConfigs.support_email}`}>{envConfigs.support_email}</a>.

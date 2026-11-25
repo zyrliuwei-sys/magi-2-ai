@@ -66,6 +66,7 @@ if (useD1) {
   const proxy = await getPlatformProxy<{ DB: any }>({
     configPath: 'wrangler.jsonc',
     persist: { path: join(directory, 'd1') },
+    remoteBindings: false,
   });
   for (const statement of ddl) await proxy.env.DB.prepare(statement).run();
   (globalThis as any).__CF_ENV__ = proxy.env;
@@ -80,7 +81,11 @@ const { settleCheckoutOrder, handleSubscriptionRenewal } =
   await import('../src/modules/payment/service');
 const { consume, revoke, getBalance } =
   await import('../src/modules/credits/service');
-const { createTask } = await import('../src/modules/ai-tasks/service');
+const { AITaskStatus, createTask, updateTask } =
+  await import('../src/modules/ai-tasks/service');
+const { saveConfigs } = await import('../src/modules/config/service');
+const { startVideoJob, readVideoJob } =
+  await import('../src/server/video-jobs');
 const { redeemInviteCode } =
   await import('../src/modules/invite-codes/service');
 
@@ -128,21 +133,19 @@ async function grantCredits(userId: string, credits: number) {
 }
 async function createdOrder(userId: string, creditsAmount = 100) {
   const orderNo = id('ORD');
-  await db()
-    .insert(schema.order)
-    .values({
-      id: orderNo,
-      orderNo,
-      userId,
-      status: 'created',
-      amount: 500,
-      currency: 'usd',
-      paymentProvider: 'stripe',
-      paymentSessionId: orderNo,
-      checkoutInfo: '{}',
-      paymentType: 'one-time',
-      creditsAmount,
-    });
+  await db().insert(schema.order).values({
+    id: orderNo,
+    orderNo,
+    userId,
+    status: 'created',
+    amount: 500,
+    currency: 'usd',
+    paymentProvider: 'stripe',
+    paymentSessionId: orderNo,
+    checkoutInfo: '{}',
+    paymentType: 'one-time',
+    creditsAmount,
+  });
   const [row] = await db()
     .select()
     .from(schema.order)
@@ -167,6 +170,94 @@ const grantsFor = (orderNo: string) =>
 
 let user = 0;
 for (const mode of MODES) {
+  test(`[${mode}] Seedance submission retries charge once and concurrent failure polling restores once`, async (t) => {
+    setAtomicModeForTests(mode);
+    const u = `u${user++}`;
+    await grantCredits(u, 5000);
+    await saveConfigs({ seeapi_api_key: 'fake-seeapi-test-key' });
+    const realFetch = globalThis.fetch;
+    let submissions = 0;
+    const input = {
+      id: crypto.randomUUID(),
+      mode: 'text-to-video',
+      prompt: 'A sparrow lands on a garden gate.',
+      duration: 5,
+      resolution: '720p',
+      ratio: '9:16',
+      audio: false,
+    } as const;
+
+    t.mock.method(
+      globalThis,
+      'fetch',
+      async (url: string, init?: RequestInit) => {
+        if (!String(url).startsWith('https://api.seeapi.com/'))
+          return realFetch(url, init);
+        if (init?.method === 'POST') {
+          submissions++;
+          assert.equal(
+            new Headers(init.headers).get('Idempotency-Key'),
+            input.id
+          );
+          assert.deepEqual(JSON.parse(String(init.body)), {
+            model: 'seedance-2-5',
+            endpoint: 'text-to-video',
+            provider: 'seeapi',
+            input: {
+              prompt: input.prompt,
+              aspect_ratio: input.ratio,
+              duration_seconds: 5,
+              resolution: '720p',
+              generate_audio: false,
+              output_format: 'mp4',
+              nsfw_checker: true,
+            },
+          });
+          if (submissions === 1)
+            throw new Error('Connection closed after request');
+          return Response.json({
+            generation: { id: 'task_seedance', status: 'processing' },
+          });
+        }
+        assert.equal(
+          url,
+          'https://api.seeapi.com/v1/generations/task_seedance'
+        );
+        return Response.json({
+          generation: { id: 'task_seedance', status: 'refunded' },
+        });
+      }
+    );
+
+    const jobs = await Promise.all([
+      startVideoJob(u, input),
+      startVideoJob(u, input),
+    ]);
+    assert.equal(submissions, 1);
+    assert.deepEqual(
+      jobs.map((job) => job?.cost),
+      [4250, 4250]
+    );
+    assert.equal(await getBalance(u), 750);
+    assert.equal(await readVideoJob('u39', input.id), undefined);
+
+    await db()
+      .update(schema.aiTask)
+      .set({ updatedAt: new Date(Date.now() - 31_000) })
+      .where(eq(schema.aiTask.id, input.id));
+    await Promise.all([readVideoJob(u, input.id), readVideoJob(u, input.id)]);
+    assert.equal(submissions, 2);
+    const terminal = await Promise.all([
+      readVideoJob(u, input.id),
+      readVideoJob(u, input.id),
+    ]);
+    assert.deepEqual(
+      terminal.map((job) => job?.status),
+      ['failed', 'failed']
+    );
+    assert.equal(await getBalance(u), 5000);
+  });
+
   test(`[${mode}] a failing statement rolls back every earlier one`, async () => {
     setAtomicModeForTests(mode);
     const u = `u${user++}`;
@@ -191,18 +282,16 @@ for (const mode of MODES) {
           .update(schema.order)
           .set({ status: 'paid' })
           .where(eq(schema.order.id, order.id)),
-        q
-          .insert(schema.credit)
-          .values({
-            id: dupId,
-            userId: u,
-            transactionNo: id('t'),
-            transactionType: 'grant',
-            transactionScene: 'gift',
-            credits: 1,
-            remainingCredits: 1,
-            status: 'active',
-          }),
+        q.insert(schema.credit).values({
+          id: dupId,
+          userId: u,
+          transactionNo: id('t'),
+          transactionType: 'grant',
+          transactionScene: 'gift',
+          credits: 1,
+          remainingCredits: 1,
+          status: 'active',
+        }),
       ])
     );
     const [row] = await db()
@@ -352,6 +441,47 @@ for (const mode of MODES) {
     assert.equal(await getBalance(u), 50);
   });
 
+  test(`[${mode}] a failed video returns its charge once and keeps its terminal status`, async () => {
+    setAtomicModeForTests(mode);
+    const u = `u${user++}`;
+    await grantCredits(u, 20);
+    const id = `video-${u}`;
+    const input = {
+      id,
+      userId: u,
+      mediaType: 'video',
+      provider: 'higgsfield',
+      model: 'sand/magi-2/text-to-video',
+      prompt: 'A slow push-in',
+      costCredits: 5,
+    };
+    await createTask(input);
+    await assert.rejects(createTask(input));
+    assert.equal(await getBalance(u), 15);
+    await updateTask({
+      taskId: id,
+      status: AITaskStatus.PROCESSING,
+      providerTaskId: 'sample-request',
+    });
+    await updateTask({
+      taskId: id,
+      status: AITaskStatus.FAILED,
+      onlyIfUnsubmitted: true,
+    });
+    assert.equal(await getBalance(u), 15);
+    await Promise.all(
+      Array.from({ length: 3 }, () =>
+        updateTask({ taskId: id, status: AITaskStatus.FAILED })
+      )
+    );
+    assert.equal(await getBalance(u), 20);
+    const final = await updateTask({
+      taskId: id,
+      status: AITaskStatus.SUCCESS,
+    });
+    assert.equal(final?.status, AITaskStatus.FAILED);
+  });
+
   test(`[${mode}] an AI task without enough credits leaves no task behind`, async () => {
     setAtomicModeForTests(mode);
     const u = `u${user++}`;
@@ -376,7 +506,7 @@ for (const mode of MODES) {
       costCredits: 10,
     });
     assert.equal(task.userId, u);
-    assert.ok(JSON.parse(task.taskInfo).creditId);
+    assert.ok(task.taskInfo && JSON.parse(task.taskInfo).creditId);
     assert.equal(await getBalance(u), 0);
     const tasks = await db()
       .select()

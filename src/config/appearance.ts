@@ -18,12 +18,13 @@
  */
 export const THEMES = [
   { id: 'classic', swatch: 'oklch(0.22 0.005 60)' },
-  { id: 'forest', swatch: 'oklch(0.52 0.12 150)' },
-  { id: 'ocean', swatch: 'oklch(0.5 0.15 255)' },
-  { id: 'violet', swatch: 'oklch(0.48 0.17 290)' },
+  // Keep legacy theme IDs for saved user and admin preferences.
+  { id: 'forest', swatch: 'var(--brand-coffee)' },
+  { id: 'ocean', swatch: 'oklch(0.425 0.075 40)' },
+  { id: 'violet', swatch: 'oklch(0.48 0.17 312)' },
   { id: 'sunset', swatch: 'oklch(0.58 0.16 42)' },
   { id: 'rose', swatch: 'oklch(0.54 0.18 10)' },
-  { id: 'slate', swatch: 'oklch(0.3 0.03 260)' },
+  { id: 'slate', swatch: 'oklch(0.31 0.038 62)' },
 ] as const;
 
 export const FONTS = [
@@ -79,7 +80,7 @@ export const COLOR_MODES = [
 ] as const;
 export type ColorModeId = (typeof COLOR_MODES)[number]['id'];
 export const COLOR_MODE_CONFIG_KEY = 'app_color_mode';
-export const DEFAULT_COLOR_MODE: ColorModeId = 'system';
+export const DEFAULT_COLOR_MODE: ColorModeId = 'dark';
 
 export function isColorMode(value: unknown): value is ColorModeId {
   return typeof value === 'string' && COLOR_MODES.some((m) => m.id === value);

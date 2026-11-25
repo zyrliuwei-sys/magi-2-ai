@@ -86,7 +86,11 @@ function CreditsPage() {
         <Badge
           variant={r.transactionType === 'consume' ? 'secondary' : 'default'}
         >
-          {r.transactionType}
+          {r.transactionType === 'grant'
+            ? m['settings.credits.tab_grant']()
+            : r.transactionType === 'consume'
+              ? m['settings.credits.tab_consume']()
+              : r.transactionType}
         </Badge>
       ),
     },

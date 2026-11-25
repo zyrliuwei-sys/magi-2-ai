@@ -48,7 +48,9 @@ async function POST({ request }: { request: Request }) {
     });
     if (userLimited) return userLimited;
 
-    const body = await request.json().catch(() => ({}));
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object' || Array.isArray(body))
+      return respErr('Invalid checkout request');
     const { product_id, payment_provider, redirect, locale } = body;
 
     if (!product_id || typeof product_id !== 'string') {
@@ -58,11 +60,12 @@ async function POST({ request }: { request: Request }) {
     // Look up product in the authoritative server-side catalog.
     // We DO NOT trust price / credits / plan from the request body.
     const product = getPricingProduct(product_id);
-    if (!product) {
-      return respErr('Unknown product');
-    }
     // Guest post packages are bought against an approved submission only.
-    if (product.kind === 'guest_post') {
+    if (
+      !product ||
+      product.checkoutEnabled === false ||
+      product.kind === 'guest_post'
+    ) {
       return respErr('Unknown product');
     }
 
@@ -125,9 +128,12 @@ async function POST({ request }: { request: Request }) {
     });
 
     return respData({ checkout_url: checkout.checkoutInfo.checkoutUrl });
-  } catch (error: any) {
-    console.error('checkout error:', error);
-    return respErr(error.message || 'Checkout failed');
+  } catch (error) {
+    console.error(
+      'checkout error:',
+      error instanceof Error ? error.name : 'Unknown error'
+    );
+    return respErr('Checkout failed');
   }
 }
 

@@ -1,26 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
+import { useSession } from '@/core/auth/client';
 import { apiGet } from '@/lib/api-client';
 import { m } from '@/paraglide/messages.js';
 
 import { SettingsForm } from './-settings-form';
 
 function SettingsPage() {
+  const { data: session } = useSession();
   const { data: user } = useQuery({
-    queryKey: ['user-info'],
-    queryFn: async () => {
-      const data = await apiGet<{
-        name?: string;
-        email?: string;
-        image?: string;
-      }>('/api/user/info');
-      return {
-        name: data.name || '',
-        email: data.email || '',
-        image: data.image || '',
-      };
-    },
+    queryKey: ['user-info', session?.user?.id],
+    queryFn: () =>
+      apiGet<{ name?: string; email?: string; image?: string }>(
+        '/api/user/info'
+      ),
+    enabled: !!session?.user?.id,
   });
 
   if (!user) {
@@ -32,7 +27,11 @@ function SettingsPage() {
   }
 
   return (
-    <SettingsForm name={user.name} email={user.email} image={user.image} />
+    <SettingsForm
+      name={user.name || ''}
+      email={user.email || ''}
+      image={user.image || ''}
+    />
   );
 }
 

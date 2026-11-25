@@ -232,7 +232,7 @@ function IndexNowPage() {
           ) : (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               {keyFile.ok ? (
-                <CheckCircle2 className="size-4 text-green-600" />
+                <CheckCircle2 className="text-primary size-4" />
               ) : (
                 <XCircle className="text-destructive size-4" />
               )}
@@ -246,7 +246,7 @@ function IndexNowPage() {
                 <ExternalLink className="size-3" />
               </a>
               <span
-                className={keyFile.ok ? 'text-green-600' : 'text-destructive'}
+                className={keyFile.ok ? 'text-primary' : 'text-destructive'}
               >
                 {keyFile.ok
                   ? m['admin.indexnow.key_file_ok']()
@@ -336,7 +336,7 @@ function IndexNowPage() {
                     key={`${i}-${j}`}
                     className={
                       a.status === 200 || a.status === 202
-                        ? 'text-green-600'
+                        ? 'text-primary'
                         : 'text-destructive'
                     }
                   >

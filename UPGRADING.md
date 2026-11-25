@@ -46,6 +46,29 @@ exports, permission codes, and behavior that changes for end users.
 
 ---
 
+## 2026-11-25: Launch security hardening
+
+Docker excludes production environment files from its build context. For a
+local build that needs build-time values, pass them with
+`docker build --secret id=build_env,src=.env.production .`. GitHub Actions
+passes its existing `ENV_PRODUCTION` secret through the same mount.
+Set server secrets via the deployment's runtime environment.
+
+The desktop sign-in callback now calls `POST /api/auth/token` with its
+allow-listed redirect. Deploy the callback page and endpoint together.
+
+## 2026-11-25: Seedance 2.5 generation and video credit plans
+
+New video jobs use the SeeAPI key saved in Admin → Settings → AI. Historical
+jobs retain their original charge and provider. The studio now quotes render
+credits by resolution and duration. No database migration is required.
+
+One-time packs and monthly plans have new `video_*_once` and `video_*_monthly`
+catalog IDs. Enable a supported USD checkout provider before selling them.
+For Creem, map the new IDs to the corresponding one-time or recurring
+products in Admin → Settings → Payments. Image-to-video requires configured
+R2 storage and an HTTPS public domain for the starting frame.
+
 ## 2026-11-14: SeeAPI credential settings and portable installer
 
 Admin → Settings → AI now includes SeeAPI (`seeapi_base_url`,

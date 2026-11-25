@@ -32,6 +32,8 @@ export type PricingProduct = {
   cnyPriceInCents?: number;
   credits: number;
   creditsValidDays?: number;
+  /** Preserve legacy product IDs for lookup while preventing new purchases. */
+  checkoutEnabled?: false;
   plan?: PricingPlanInfo;
   /**
    * 'guest_post': a guest post package. Sold only through
@@ -43,12 +45,87 @@ export type PricingProduct = {
   maxLinks?: number;
 };
 
-/**
- * Default demo catalog. Replace with your real products when launching.
- * Keys MUST match what the pricing UI sends as product_id.
- */
+export const videoPlans = {
+  oneTime: [
+    {
+      tier: 'starter',
+      productId: 'video_starter_once',
+      label: 'Starter',
+      credits: 9500,
+      priceInCents: 1500,
+    },
+    {
+      tier: 'creator',
+      productId: 'video_creator_once',
+      label: 'Creator',
+      credits: 28500,
+      priceInCents: 3900,
+    },
+    {
+      tier: 'studio',
+      productId: 'video_studio_once',
+      label: 'Studio',
+      credits: 76000,
+      priceInCents: 8900,
+    },
+  ],
+  monthly: [
+    {
+      tier: 'starter',
+      productId: 'video_starter_monthly',
+      label: 'Starter',
+      credits: 15200,
+      priceInCents: 1900,
+    },
+    {
+      tier: 'creator',
+      productId: 'video_creator_monthly',
+      label: 'Creator',
+      credits: 45600,
+      priceInCents: 4900,
+    },
+    {
+      tier: 'studio',
+      productId: 'video_studio_monthly',
+      label: 'Studio',
+      credits: 121600,
+      priceInCents: 11900,
+    },
+  ],
+} as const;
+
+const videoProducts = [
+  ...videoPlans.oneTime.map(({ label, productId, credits, priceInCents }) => ({
+    productId,
+    productName: `${label} Video Credit Pack`,
+    planName: label,
+    description: `${credits} video credits`,
+    type: PaymentType.ONE_TIME,
+    priceInCents,
+    currency: 'usd',
+    credits,
+  })),
+  ...videoPlans.monthly.map(({ label, productId, credits, priceInCents }) => ({
+    productId,
+    productName: `${label} Video Subscription`,
+    planName: label,
+    description: `${credits} video credits per month`,
+    type: PaymentType.SUBSCRIPTION,
+    priceInCents,
+    currency: 'usd',
+    credits,
+    creditsValidDays: 31,
+    plan: { name: label, interval: PaymentInterval.MONTH, intervalCount: 1 },
+  })),
+] satisfies PricingProduct[];
+
 export const pricingCatalog: Record<string, PricingProduct> = {
+  ...Object.fromEntries(
+    videoProducts.map((product) => [product.productId, product])
+  ),
+  // Retired template products. Existing orders and subscriptions retain their snapshots.
   starter_monthly: {
+    checkoutEnabled: false,
     productId: 'starter_monthly',
     productName: 'Starter',
     planName: 'Starter',
@@ -64,6 +141,7 @@ export const pricingCatalog: Record<string, PricingProduct> = {
     },
   },
   pro_monthly: {
+    checkoutEnabled: false,
     productId: 'pro_monthly',
     productName: 'Pro',
     planName: 'Pro',
@@ -75,6 +153,7 @@ export const pricingCatalog: Record<string, PricingProduct> = {
     plan: { name: 'Pro', interval: PaymentInterval.MONTH, intervalCount: 1 },
   },
   enterprise_monthly: {
+    checkoutEnabled: false,
     productId: 'enterprise_monthly',
     productName: 'Enterprise',
     planName: 'Enterprise',
@@ -90,6 +169,7 @@ export const pricingCatalog: Record<string, PricingProduct> = {
     },
   },
   starter_yearly: {
+    checkoutEnabled: false,
     productId: 'starter_yearly',
     productName: 'Starter',
     planName: 'Starter',
@@ -101,6 +181,7 @@ export const pricingCatalog: Record<string, PricingProduct> = {
     plan: { name: 'Starter', interval: PaymentInterval.YEAR, intervalCount: 1 },
   },
   pro_yearly: {
+    checkoutEnabled: false,
     productId: 'pro_yearly',
     productName: 'Pro',
     planName: 'Pro',
@@ -112,6 +193,7 @@ export const pricingCatalog: Record<string, PricingProduct> = {
     plan: { name: 'Pro', interval: PaymentInterval.YEAR, intervalCount: 1 },
   },
   enterprise_yearly: {
+    checkoutEnabled: false,
     productId: 'enterprise_yearly',
     productName: 'Enterprise',
     planName: 'Enterprise',
@@ -127,6 +209,7 @@ export const pricingCatalog: Record<string, PricingProduct> = {
     },
   },
   starter_lifetime: {
+    checkoutEnabled: false,
     productId: 'starter_lifetime',
     productName: 'Starter',
     planName: 'Starter Lifetime',
@@ -137,6 +220,7 @@ export const pricingCatalog: Record<string, PricingProduct> = {
     credits: 100000,
   },
   pro_lifetime: {
+    checkoutEnabled: false,
     productId: 'pro_lifetime',
     productName: 'Pro',
     planName: 'Pro Lifetime',
@@ -147,6 +231,7 @@ export const pricingCatalog: Record<string, PricingProduct> = {
     credits: 1000000,
   },
   enterprise_lifetime: {
+    checkoutEnabled: false,
     productId: 'enterprise_lifetime',
     productName: 'Enterprise',
     planName: 'Enterprise Lifetime',
@@ -188,8 +273,9 @@ export const pricingCatalog: Record<string, PricingProduct> = {
 };
 
 export function getPricingProduct(productId: string): PricingProduct | null {
-  if (!productId) return null;
-  return pricingCatalog[productId] ?? null;
+  return Object.hasOwn(pricingCatalog, productId)
+    ? pricingCatalog[productId]
+    : null;
 }
 
 export function listPricingProducts(): PricingProduct[] {

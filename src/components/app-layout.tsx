@@ -55,7 +55,7 @@ export function AppLayout({
   // Invite-only gate: needs the user's membership status (also covers social
   // logins). `needsInvite` is computed server-side in /api/user/info.
   const userInfoQuery = useQuery({
-    queryKey: ['user-info'],
+    queryKey: ['user-info', session?.user?.id],
     queryFn: () => apiGet<{ needsInvite?: boolean }>('/api/user/info'),
     staleTime: 60_000,
     enabled: !!session?.user,

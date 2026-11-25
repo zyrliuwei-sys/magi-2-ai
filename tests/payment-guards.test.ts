@@ -36,6 +36,7 @@ const { enforceMinIntervalRateLimit } = await import('../src/lib/rate-limit');
 const { PATCH: patchOrder } =
   await import('../src/server/admin/handlers/orders');
 const { isValidEmbedSetting } = await import('../src/lib/embed-ids');
+const { getPricingProduct, videoPlans } = await import('../src/config/pricing');
 
 before(async () => {
   await db()
@@ -70,6 +71,35 @@ const success = (orderNo: string, amount: number) => ({
   paymentStatus: 'paid',
   paymentInfo: { amount, transactionId: `T-${orderNo}` },
   paymentResult: { out_trade_no: orderNo },
+});
+
+test('each video price resolves to its server-side credits and billing frequency', () => {
+  for (const [billing, plans] of Object.entries(videoPlans)) {
+    assert.equal(plans.length, 3);
+    assert.equal(new Set(plans.map((plan) => plan.priceInCents)).size, 3);
+    for (const plan of plans) {
+      const product = getPricingProduct(plan.productId);
+      assert.ok(product && product.checkoutEnabled !== false);
+      assert.equal(product.priceInCents, plan.priceInCents);
+      assert.equal(product.credits, plan.credits);
+      assert.equal(product.currency, 'usd');
+      if (billing === 'monthly') {
+        assert.equal(product.type, 'subscription');
+        assert.equal(product.plan?.interval, 'month');
+        assert.equal(product.plan?.intervalCount, 1);
+        assert.ok(product.creditsValidDays);
+      } else {
+        assert.equal(product.type, 'one-time');
+        assert.equal(product.plan, undefined);
+        assert.equal(product.creditsValidDays, undefined);
+      }
+    }
+  }
+  assert.equal(
+    getPricingProduct('enterprise_lifetime')?.checkoutEnabled,
+    false
+  );
+  assert.equal(getPricingProduct('__proto__'), null);
 });
 
 test('a CNY notification whose amount differs from the order is refused and grants nothing', async () => {

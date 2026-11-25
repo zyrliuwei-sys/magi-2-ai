@@ -1,11 +1,11 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createFileRoute } from '@tanstack/react-router';
+import { MultipartTooLargeError, readMultipartForm } from '@/server/multipart';
 
 import { getAuth } from '@/core/auth';
 import { envConfigs } from '@/config';
 import { getStorage } from '@/modules/storage/service';
-import { md5 } from '@/lib/hash';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
 
@@ -22,7 +22,7 @@ const extFromMime = (mimeType: string) => {
     'image/heic': 'heic',
     'image/heif': 'heif',
   };
-  return map[mimeType] || '';
+  return Object.hasOwn(map, mimeType) ? map[mimeType] : '';
 };
 
 // Cap for the no-storage local-disk fallback (dev). Configurable via INLINE_IMAGE_MAX_KB.
@@ -54,20 +54,34 @@ async function POST({ request }: { request: Request }) {
     });
     if (userLimited) return userLimited;
 
-    // Refuse oversized bodies before buffering them, when the size is declared.
-    const declared = Number(request.headers.get('content-length') || 0);
-    if (declared > MAX_REQUEST_BYTES + 64 * 1024) {
-      return respErr('Upload is larger than 20MB in total');
+    let formData: FormData;
+    try {
+      formData = await readMultipartForm(
+        request,
+        MAX_REQUEST_BYTES + 64 * 1024
+      );
+    } catch (error) {
+      return error instanceof MultipartTooLargeError
+        ? respErr('Upload is larger than 20MB in total', { status: 413 })
+        : respErr('Invalid image upload', { status: 400 });
     }
-
-    const formData = await request.formData();
-    const files = formData.getAll('files') as File[];
-    if (!files.length) return respErr('No files provided');
+    const files = formData.getAll('files');
+    if (
+      !files.length ||
+      !files.every((file): file is File => file instanceof File)
+    )
+      return respErr('No files provided');
     if (files.length > MAX_FILES_PER_REQUEST) {
       return respErr(`At most ${MAX_FILES_PER_REQUEST} files per upload`);
     }
     if (files.reduce((sum, f) => sum + f.size, 0) > MAX_REQUEST_BYTES) {
       return respErr('Upload is larger than 20MB in total');
+    }
+    for (const file of files) {
+      if (!extFromMime(file.type))
+        return respErr(`File ${file.name} is not a supported image type`);
+      if (file.size > MAX_UPLOAD_BYTES)
+        return respErr(`File ${file.name} is larger than 10MB`);
     }
 
     const storage = await getStorage();
@@ -82,17 +96,13 @@ async function POST({ request }: { request: Request }) {
       // The extension (and so how the file is served) comes only from this
       // allow-list — never from the client-supplied file name.
       const ext = extFromMime(file.type);
-      if (!ext) {
-        return respErr(`File ${file.name} is not a supported image type`);
-      }
-      if (file.size > MAX_UPLOAD_BYTES) {
-        return respErr(`File ${file.name} is larger than 10MB`);
-      }
-
       const arrayBuffer = await file.arrayBuffer();
       const body = new Uint8Array(arrayBuffer);
 
-      const digest = md5(body);
+      const digest = Array.from(
+        new Uint8Array(await crypto.subtle.digest('SHA-256', arrayBuffer)),
+        (byte) => byte.toString(16).padStart(2, '0')
+      ).join('');
       // R2Provider prepends its own uploadPath (default `uploads`), so the object
       // key is the bare filename. The local fallback uses `public/uploads/<file>`.
       const objectKey = `${digest}.${ext}`;
@@ -148,7 +158,7 @@ async function POST({ request }: { request: Request }) {
       });
 
       if (!result.success || !result.url) {
-        return respErr(result.error || 'Upload failed');
+        return respErr('Upload failed');
       }
 
       uploadResults.push({
@@ -163,9 +173,12 @@ async function POST({ request }: { request: Request }) {
       urls: uploadResults.map((r) => r.url),
       results: uploadResults,
     });
-  } catch (e: any) {
-    console.error('upload image failed:', e);
-    return respErr(e?.message || 'upload image failed');
+  } catch (error) {
+    console.error(
+      'upload image failed:',
+      error instanceof Error ? error.name : 'Unknown error'
+    );
+    return respErr('Upload failed');
   }
 }
 

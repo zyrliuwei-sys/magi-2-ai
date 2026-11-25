@@ -7,6 +7,11 @@ import { getLocalPosts, mergePosts } from '@/content/posts';
 const STATIC_PATHS = [
   '',
   '/pricing',
+  '/text-to-video',
+  '/image-to-video',
+  '/examples',
+  '/prompts',
+  '/guide',
   '/blog',
   '/privacy-policy',
   '/terms-of-service',
@@ -25,18 +30,27 @@ function urlFor(path: string, locale: string, origin: string): string {
   }).href;
 }
 
+function xmlText(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
 function entryXml(e: Entry, origin: string): string {
   const alternates = locales
     .map(
       (loc) =>
-        `    <xhtml:link rel="alternate" hreflang="${loc}" href="${urlFor(e.path, loc, origin)}"/>`
+        `    <xhtml:link rel="alternate" hreflang="${loc}" href="${xmlText(urlFor(e.path, loc, origin))}"/>`
     )
     .join('\n');
   return [
     '  <url>',
-    `    <loc>${urlFor(e.path, baseLocale, origin)}</loc>`,
+    `    <loc>${xmlText(urlFor(e.path, baseLocale, origin))}</loc>`,
     alternates,
-    e.lastModified ? `    <lastmod>${e.lastModified}</lastmod>` : null,
+    e.lastModified ? `    <lastmod>${xmlText(e.lastModified)}</lastmod>` : null,
     `    <changefreq>${e.changeFrequency}</changefreq>`,
     `    <priority>${e.priority}</priority>`,
     '  </url>',
@@ -59,7 +73,18 @@ export const Route = createFileRoute('/sitemap.xml')({
         try {
           const { listPublishedArticles } =
             await import('@/modules/posts/service');
-          const rows = await listPublishedArticles().catch(() => []);
+          const { getConfig } = await import('@/modules/config/service');
+          const [rows, guestPostsEnabled] = await Promise.all([
+            listPublishedArticles().catch(() => []),
+            getConfig('guest_post_enabled').catch(() => undefined),
+          ]);
+          if (guestPostsEnabled === 'true') {
+            entries.push({
+              path: '/guest-post',
+              changeFrequency: 'weekly',
+              priority: 0.6,
+            });
+          }
           const dbPosts = rows.map((row) => ({
             slug: row.slug,
             title: row.title || row.slug,
@@ -70,7 +95,7 @@ export const Route = createFileRoute('/sitemap.xml')({
           const posts = mergePosts(dbPosts, getLocalPosts(baseLocale));
           for (const post of posts) {
             entries.push({
-              path: `/blog/${post.slug}`,
+              path: `/blog/${encodeURIComponent(post.slug)}`,
               lastModified: post.createdAt,
               changeFrequency: 'monthly',
               priority: 0.6,
@@ -80,7 +105,7 @@ export const Route = createFileRoute('/sitemap.xml')({
           // Database unreachable — static paths + local posts still listed.
           for (const post of getLocalPosts(baseLocale)) {
             entries.push({
-              path: `/blog/${post.slug}`,
+              path: `/blog/${encodeURIComponent(post.slug)}`,
               lastModified: post.createdAt,
               changeFrequency: 'monthly',
               priority: 0.6,
@@ -88,10 +113,11 @@ export const Route = createFileRoute('/sitemap.xml')({
           }
         }
 
+        const origin = serverSiteOrigin();
         const xml = [
           '<?xml version="1.0" encoding="UTF-8"?>',
           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
-          ...entries.map((entry) => entryXml(entry, serverSiteOrigin())),
+          ...entries.map((entry) => entryXml(entry, origin)),
           '</urlset>',
           '',
         ].join('\n');

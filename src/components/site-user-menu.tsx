@@ -1,10 +1,12 @@
 'use client';
 
 import { LogOutIcon, SettingsIcon, ShieldIcon } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { signOut } from '@/core/auth/client';
-import { Link, useRouter } from '@/core/i18n/navigation';
+import { Link } from '@/core/i18n/navigation';
 import { m } from '@/paraglide/messages.js';
+import { localizeHref } from '@/paraglide/runtime.js';
 import { useUserPermissions } from '@/hooks/use-user-permissions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -26,13 +28,18 @@ export function SiteUserMenu({
   email: string;
   image?: string | null;
 }) {
-  const router = useRouter();
   const { data } = useUserPermissions();
   const isAdmin = data?.isAdmin === true;
 
   async function handleSignOut() {
-    await signOut();
-    router.push('/');
+    try {
+      const result = await signOut();
+      if (!result.error) {
+        window.location.replace(localizeHref('/'));
+        return;
+      }
+    } catch {}
+    toast.error(m['common.sign.sign_out_failed']());
   }
 
   return (

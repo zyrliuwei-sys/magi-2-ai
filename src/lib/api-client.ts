@@ -27,7 +27,9 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
     headers: {
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(init?.body && !(init.body instanceof FormData)
+        ? { 'Content-Type': 'application/json' }
+        : {}),
       ...init?.headers,
     },
   });
@@ -64,6 +66,9 @@ export const apiPost = <T = void>(url: string, body?: unknown) =>
     body: body == null ? undefined : JSON.stringify(body),
   });
 
+export const apiPostForm = <T>(url: string, body: FormData) =>
+  request<T>(url, { method: 'POST', body });
+
 export const apiPut = <T = void>(url: string, body?: unknown) =>
   request<T>(url, { method: 'PUT', body: JSON.stringify(body) });
 
@@ -97,4 +102,11 @@ export async function apiGetAll<T>(base: string): Promise<T[]> {
     items.push(...res.items);
     if (res.items.length < pageSize || items.length >= res.total) return items;
   }
+}
+
+/** Files returned by the site or by an approved media provider. */
+export async function apiGetBlob(url: string) {
+  const response = await fetch(url, { credentials: 'same-origin' });
+  if (!response.ok) throw new ApiError(response.status, 'File request failed');
+  return response.blob();
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { LifeBuoy, X } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,6 +31,7 @@ import { Textarea } from '@/components/ui/textarea';
  * Requires login — unauthenticated users get a sign-in prompt instead.
  */
 export function SupportWidget() {
+  const queryClient = useQueryClient();
   const { data: session, isPending } = useSession();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -48,14 +50,17 @@ export function SupportWidget() {
     setSubmitting(true);
     try {
       await apiPost('/api/tickets', { title, content, attachments });
+      void queryClient.invalidateQueries({ queryKey: ['user-tickets'] });
       toast.success(m['common.support.success']());
       setOpen(false);
       setTitle('');
       setContent('');
       setAttachments([]);
       setUploaderKey((k) => k + 1);
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : m['common.support.failed']()
+      );
     } finally {
       setSubmitting(false);
     }
@@ -67,8 +72,14 @@ export function SupportWidget() {
   return (
     <>
       <button
-        aria-label={m['common.support.open_label']()}
-        onClick={() => setOpen(true)}
+        type="button"
+        aria-label={
+          open
+            ? m['common.support.close_label']()
+            : m['common.support.open_label']()
+        }
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
         className={cn(
           'fixed right-6 bottom-6 z-50 size-12 rounded-full',
           'bg-primary text-primary-foreground shadow-lg',
@@ -76,7 +87,11 @@ export function SupportWidget() {
           'transition-all hover:scale-105 hover:shadow-xl'
         )}
       >
-        {open ? <X className="size-5" /> : <LifeBuoy className="size-5" />}
+        {open ? (
+          <X className="pointer-events-none size-5" />
+        ) : (
+          <LifeBuoy className="pointer-events-none size-5" />
+        )}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -154,6 +169,7 @@ export function SupportWidget() {
                   <Link
                     href="/settings/tickets"
                     className="hover:text-foreground underline"
+                    onClick={() => setOpen(false)}
                   >
                     {m['common.support.track_hint_link']()}
                   </Link>

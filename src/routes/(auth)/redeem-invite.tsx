@@ -4,10 +4,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import { signOut, useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import { privatePageHead } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
   Field,
   FieldDescription,
@@ -109,9 +110,12 @@ function RedeemInvitePage() {
         </span>
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">
+            <h1
+              data-slot="card-title"
+              className="text-xl leading-snug font-medium"
+            >
               {m['common.sign.redeem_title']()}
-            </CardTitle>
+            </h1>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit}>
@@ -160,5 +164,6 @@ function RedeemInvitePage() {
 }
 
 export const Route = createFileRoute('/(auth)/redeem-invite')({
+  head: () => privatePageHead(m['common.sign.redeem_title']()),
   component: RedeemInvitePage,
 });

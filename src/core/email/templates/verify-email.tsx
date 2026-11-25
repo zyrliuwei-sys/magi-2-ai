@@ -84,10 +84,10 @@ const styles: Record<string, React.CSSProperties> = {
   body: {
     margin: 0,
     padding: 0,
-    backgroundColor: '#f6f9fc',
+    backgroundColor: '#faf5ed',
     fontFamily:
       '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif',
-    color: '#0f172a',
+    color: '#251b14',
   },
   container: {
     maxWidth: 560,
@@ -98,16 +98,15 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: '28px 24px',
-    border: '1px solid rgba(15, 23, 42, 0.08)',
+    border: '1px solid rgba(37, 27, 20, 0.08)',
     boxShadow:
-      '0 20px 50px rgba(2, 6, 23, 0.10), 0 2px 8px rgba(2, 6, 23, 0.05)',
+      '0 20px 50px rgba(37, 27, 20, 0.10), 0 2px 8px rgba(37, 27, 20, 0.05)',
   },
   accentBar: {
     height: 6,
     borderRadius: 999,
     marginBottom: 18,
-    background:
-      'linear-gradient(90deg, rgba(99,102,241,1) 0%, rgba(236,72,153,1) 55%, rgba(14,165,233,1) 100%)',
+    backgroundColor: '#805433',
   },
   h1: {
     margin: '0 0 10px',
@@ -124,29 +123,29 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cardLogo: {
     borderRadius: 10,
-    border: '1px solid rgba(15, 23, 42, 0.10)',
-    backgroundColor: 'rgba(15, 23, 42, 0.03)',
+    border: '1px solid rgba(37, 27, 20, 0.10)',
+    backgroundColor: 'rgba(37, 27, 20, 0.03)',
   },
   cardBrand: {
     marginTop: 8,
     fontSize: 14,
     lineHeight: '18px',
     fontWeight: 600,
-    color: '#0f172a',
+    color: '#251b14',
     letterSpacing: '-0.01em',
   },
   p: {
     margin: '0 0 18px',
     fontSize: 14,
     lineHeight: '22px',
-    color: '#334155',
+    color: '#4e3d30',
   },
   buttonWrap: {
     textAlign: 'center',
     margin: '18px 0 14px',
   },
   button: {
-    backgroundColor: '#111827',
+    backgroundColor: '#805433',
     borderRadius: 12,
     color: '#ffffff',
     fontSize: 14,
@@ -159,29 +158,29 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '0 0 10px',
     fontSize: 12,
     lineHeight: '18px',
-    color: '#64748b',
+    color: '#695647',
     textAlign: 'center',
   },
   hr: {
-    borderColor: 'rgba(15, 23, 42, 0.08)',
+    borderColor: 'rgba(37, 27, 20, 0.08)',
     margin: '18px 0',
   },
   small: {
     margin: '0 0 6px',
     fontSize: 12,
     lineHeight: '18px',
-    color: '#64748b',
+    color: '#695647',
   },
   link: {
     fontSize: 12,
     lineHeight: '18px',
-    color: '#2563eb',
+    color: '#805433',
     wordBreak: 'break-all',
   },
   footer: {
     margin: '18px 0 0',
     fontSize: 12,
     lineHeight: '18px',
-    color: '#94a3b8',
+    color: '#695647',
   },
 };

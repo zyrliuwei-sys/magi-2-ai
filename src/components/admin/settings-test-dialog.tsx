@@ -190,13 +190,13 @@ function TestResultView({ result }: { result: TestResult }) {
     <div
       className={`rounded-lg border p-3 text-sm ${
         result.success
-          ? 'border-emerald-500/30 bg-emerald-500/5'
+          ? 'border-primary/30 bg-primary/5'
           : 'border-destructive/30 bg-destructive/5'
       }`}
     >
       <div className="flex items-start gap-2 font-medium">
         {result.success ? (
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+          <CheckCircle2 className="text-primary mt-0.5 size-4 shrink-0" />
         ) : (
           <XCircle className="text-destructive mt-0.5 size-4 shrink-0" />
         )}

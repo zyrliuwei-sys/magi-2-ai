@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { authClient, useSession } from '@/core/auth/client';
 import { Link, useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import { privatePageHead } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { deLocalizeHref, localizeHref } from '@/paraglide/runtime.js';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,6 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -236,12 +236,16 @@ function VerifyEmailPage() {
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg md:text-xl">
+            <h1
+              data-slot="card-title"
+              className="text-lg leading-snug font-medium md:text-xl"
+            >
               {m['common.sign.verify_email_page_title']()}
-            </CardTitle>
+            </h1>
             <CardDescription className="text-xs md:text-sm">
-              {m['common.sign.verify_email_page_description']()}
-              {email ? ` ${email}` : ''}
+              {email
+                ? `${m['common.sign.verify_email_page_description']()} ${email}.`
+                : m['common.sign.verify_email_inbox_description']()}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -250,7 +254,7 @@ function VerifyEmailPage() {
                 type="button"
                 variant="outline"
                 className="w-full"
-                disabled={loading || cooldownSeconds > 0}
+                disabled={!email || loading || cooldownSeconds > 0}
                 onClick={handleResend}
               >
                 {loading ? (
@@ -299,5 +303,6 @@ function VerifyEmailPage() {
 }
 
 export const Route = createFileRoute('/(auth)/verify-email')({
+  head: () => privatePageHead(m['common.sign.verify_email_page_title']()),
   component: VerifyEmailPage,
 });

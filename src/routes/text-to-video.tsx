@@ -1,0 +1,52 @@
+import { createFileRoute } from '@tanstack/react-router';
+
+import { envConfigs } from '@/config';
+import { m } from '@/paraglide/messages.js';
+import { MagiInsight } from '@/blocks/magi-editorial';
+import {
+  MagiFAQ,
+  MagiGallery,
+  MagiHow,
+  MagiPromptLibrary,
+} from '@/blocks/magi-library';
+import { magiHead, MagiIntro, MagiSite } from '@/blocks/magi-site';
+import { MagiStudio, parseStudioSearch } from '@/blocks/magi-studio';
+
+function ToolPage() {
+  const search = Route.useSearch();
+  return (
+    <MagiSite>
+      <div className="magi-wrap">
+        <MagiIntro
+          studio
+          title={m['video.page.text.title']()}
+          description={m['video.page.text.description']()}
+        />
+        <MagiStudio
+          key={search.prompt ?? 'text-to-video'}
+          preview="text"
+          initialMode="text-to-video"
+          promptId={search.prompt}
+          taskId={search.task}
+          restore={search.restore}
+        />
+        <MagiPromptLibrary compact mode="text-to-video" />
+        <MagiGallery collection="text" />
+        <MagiHow />
+        <MagiInsight page="text" />
+        <MagiFAQ />
+      </div>
+    </MagiSite>
+  );
+}
+
+export const Route = createFileRoute('/text-to-video')({
+  validateSearch: parseStudioSearch,
+  head: () =>
+    magiHead(
+      '/text-to-video',
+      m['video.page.text.seo_title']({ appName: envConfigs.app_name }),
+      m['video.page.text.seo_description']()
+    ),
+  component: ToolPage,
+});

@@ -3,12 +3,13 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Loader2 } from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
-import { apiGet } from '@/lib/api-client';
+import { apiPost } from '@/lib/api-client';
 import {
   isAllowedAppProtocolUrl,
   isAppProtocolUrl,
   safeInternalPath,
 } from '@/lib/redirect';
+import { privatePageHead } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
@@ -68,11 +69,11 @@ function AuthCallbackPage() {
     }
 
     handledRef.current = true;
-    apiGet<{ token: string }>('/api/auth/token')
+    apiPost<{ token: string }>('/api/auth/token', { redirect: target })
       .then(({ token }) => {
-        const url = target as string;
-        const separator = url.includes('?') ? '&' : '?';
-        window.location.href = `${url}${separator}token=${encodeURIComponent(token)}`;
+        const url = new URL(target!);
+        url.searchParams.set('token', token);
+        window.location.href = url.href;
       })
       .catch((err: Error) => {
         handledRef.current = false;
@@ -97,5 +98,6 @@ function AuthCallbackPage() {
 }
 
 export const Route = createFileRoute('/(auth)/auth-callback')({
+  head: () => privatePageHead(m['common.auth_callback.redirecting']()),
   component: AuthCallbackPage,
 });

@@ -19,6 +19,14 @@ import { deLocalizeHref } from '@/paraglide/runtime.js';
 const AUTH_PATH_RE =
   /^\/(sign-in|sign-up|verify-email|forgot-password|reset-password|auth-callback)(\/|\?|#|$)/;
 
+export function parseAuthEntrySearch(search: Record<string, unknown>) {
+  return {
+    callbackUrl:
+      typeof search.callbackUrl === 'string' ? search.callbackUrl : undefined,
+    redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
+  };
+}
+
 /**
  * Normalize a redirect target to a same-origin path (`/foo?a=1#b`), or null if
  * it points elsewhere / at an auth page. Absolute URLs on this origin are
@@ -29,22 +37,22 @@ export function safeInternalPath(
 ): string | null {
   if (!input) return null;
 
-  let path = input;
-  if (!path.startsWith('/') || path.startsWith('//')) {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    if (!origin) return null;
-    try {
-      const url = new URL(path, origin);
-      if (url.origin !== origin) return null;
-      path = url.pathname + url.search + url.hash;
-    } catch {
-      return null;
-    }
-  }
+  const browserOrigin =
+    typeof window !== 'undefined' ? window.location.origin : undefined;
+  if (!browserOrigin && (!input.startsWith('/') || input.startsWith('//')))
+    return null;
 
-  // Legacy callback URLs must also canonicalize during client navigation.
-  path = path.replace(/^[^?#]*/, (pathname) => englishPathname(pathname));
-  return AUTH_PATH_RE.test(path) ? null : path;
+  const origin = browserOrigin ?? 'https://local.invalid';
+  try {
+    const url = new URL(input, origin);
+    if (url.origin !== origin) return null;
+    const pathname = englishPathname(url.pathname);
+    if (pathname.startsWith('//')) return null;
+    const path = pathname + url.search + url.hash;
+    return AUTH_PATH_RE.test(path) ? null : path;
+  } catch {
+    return null;
+  }
 }
 
 // Schemes that execute or embed rather than hand off to an installed app.

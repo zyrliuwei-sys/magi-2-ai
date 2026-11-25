@@ -45,9 +45,9 @@ export function BlogCard({
             {badge}
           </span>
         )}
-        <h3 className="leading-snug font-medium group-hover:underline group-hover:underline-offset-4">
+        <h2 className="leading-snug font-medium group-hover:underline group-hover:underline-offset-4">
           {title}
-        </h3>
+        </h2>
         {description && (
           <p className="text-muted-foreground line-clamp-3 text-sm leading-relaxed">
             {description}

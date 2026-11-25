@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { videoAvailability } from '@/server/video-jobs';
 
 import { filterPublicConfigs, getAllConfigs } from '@/modules/config/service';
 import { getStoredFooterBadges } from '@/modules/footer-badges/service';
@@ -58,6 +59,9 @@ async function GET({ request }: { request: Request }) {
     getStoredFooterBadges(),
   ]);
   const result = filterPublicConfigs(configs, publicKeys);
+  const video = videoAvailability(configs);
+  result.video_generation_enabled = String(video.text);
+  result.video_image_generation_enabled = String(video.image);
   if (storedFooterBadges === undefined) delete result.footer_badges;
   else result.footer_badges = storedFooterBadges;
   const emailConfigured = isEmailSendingConfigured(configs);

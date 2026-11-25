@@ -1,16 +1,18 @@
+import { envConfigs } from '../../config/index';
+
 export const meta = {
   title: 'Terms of Service',
-  description: 'The terms and conditions for using our service.',
-  updated_at: '2026-05-21',
+  description: `Terms for using the ${envConfigs.app_name} short video generator, including accounts, uploads, and video credits.`,
+  updated_at: '2026-11-25',
 };
 
 ## Acceptance of Terms
 
-By accessing or using this service, you agree to be bound by these Terms of Service. If you do not agree, please do not use the service.
+By accessing or using {envConfigs.app_name}, you agree to these Terms of Service. If you do not agree, please do not use the service.
 
 ## Description of Service
 
-We provide a software-as-a-service platform. We may modify, suspend, or discontinue any part of the service at any time, with reasonable notice where possible.
+{envConfigs.app_name} generates short videos from text prompts or a starting image using Seedance 2.5. You are responsible for having permission to use the images and other material you submit. Review generated clips before publishing them.
 
 ## User Accounts
 
@@ -28,7 +30,7 @@ You agree not to:
 
 ## Payment and Billing
 
-Paid features are billed in advance for the selected billing period. You are responsible for providing accurate billing information. Refunds are handled on a case-by-case basis in line with our refund policy.
+Video credits are available through one-time packs and monthly plans. The studio shows the credit cost before you submit a generation. Failed and canceled jobs return the credits charged for that job.
 
 ## Intellectual Property
 
@@ -36,7 +38,7 @@ The service and its original content, features, and functionality are owned by u
 
 ## Termination
 
-We may suspend or terminate your access to the service at any time if you violate these terms. You may close your account at any time through your account settings.
+We may suspend or terminate your access to the service at any time if you violate these terms. To request account closure, email support using the contact address below.
 
 ## Limitation of Liability
 
@@ -48,4 +50,4 @@ We may modify these Terms at any time. We will notify users of any material chan
 
 ## Contact
 
-If you have questions about these Terms, please contact us at the email address provided on our website.
+For questions about these Terms, email{' '}<a className="text-primary font-medium underline underline-offset-4" href={`mailto:${envConfigs.support_email}`}>{envConfigs.support_email}</a>.
