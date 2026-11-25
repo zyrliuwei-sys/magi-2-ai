@@ -161,7 +161,7 @@ export function MagiHomeIntro() {
   return (
     <header className="magi-home-intro">
       <h1>
-        <span>{envConfigs.app_name}</span> <span>{m['video.home.tool']()}</span>
+        <span>{m['video.home.topic']()}</span> <span>{m['video.home.tool']()}</span>
       </h1>
       <p>{m['video.home.description']()}</p>
       <MagiLink href="#magi-overview">
