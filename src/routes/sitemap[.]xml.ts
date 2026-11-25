@@ -4,22 +4,25 @@ import { serverSiteOrigin } from '@/lib/site-origin';
 import { baseLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
 import { getLocalPosts, mergePosts } from '@/content/posts';
 
-const STATIC_PATHS = [
-  '',
-  '/pricing',
-  '/text-to-video',
-  '/image-to-video',
-  '/examples',
-  '/prompts',
-  '/guide',
-  '/blog',
-  '/privacy-policy',
-  '/terms-of-service',
-];
+// Date of the most recent substantive content edit on each static page.
+const STATIC_LAST_MODIFIED = {
+  '': '2026-11-25',
+  '/pricing': '2026-11-25',
+  '/text-to-video': '2026-11-25',
+  '/image-to-video': '2026-11-25',
+  '/examples': '2026-11-25',
+  '/prompts': '2026-11-25',
+  '/guide': '2026-11-25',
+  '/magi-2-preview': '2026-11-25',
+  '/privacy-policy': '2026-11-25',
+  '/terms-of-service': '2026-11-25',
+} satisfies Record<string, string>;
+
+const POLICY_PATHS = new Set(['/privacy-policy', '/terms-of-service']);
 
 type Entry = {
   path: string;
-  lastModified?: string;
+  lastModified: string;
   changeFrequency: string;
   priority: number;
 };
@@ -50,12 +53,11 @@ function entryXml(e: Entry, origin: string): string {
     '  <url>',
     `    <loc>${xmlText(urlFor(e.path, baseLocale, origin))}</loc>`,
     alternates,
-    e.lastModified ? `    <lastmod>${xmlText(e.lastModified)}</lastmod>` : null,
+    `    <lastmod>${xmlText(e.lastModified)}</lastmod>`,
     `    <changefreq>${e.changeFrequency}</changefreq>`,
     `    <priority>${e.priority}</priority>`,
     '  </url>',
   ]
-    .filter(Boolean)
     .join('\n');
 }
 
@@ -63,11 +65,16 @@ export const Route = createFileRoute('/sitemap.xml')({
   server: {
     handlers: {
       GET: async () => {
-        const entries: Entry[] = STATIC_PATHS.map((path) => ({
-          path,
-          changeFrequency: path === '/blog' ? 'daily' : 'weekly',
-          priority: path === '' ? 1 : 0.8,
-        }));
+        const entries: Entry[] = Object.entries(STATIC_LAST_MODIFIED).map(
+          ([path, lastModified]) => ({
+            path,
+            lastModified,
+            changeFrequency: POLICY_PATHS.has(path) ? 'yearly' : 'weekly',
+            priority: path === '' ? 1 : POLICY_PATHS.has(path) ? 0.3 : 0.8,
+          })
+        );
+        const localPosts = getLocalPosts(baseLocale);
+        let posts = localPosts;
 
         // Blog posts: db posts merged with local MDX posts.
         try {
@@ -81,6 +88,7 @@ export const Route = createFileRoute('/sitemap.xml')({
           if (guestPostsEnabled === 'true') {
             entries.push({
               path: '/guest-post',
+              lastModified: '2026-11-25',
               changeFrequency: 'weekly',
               priority: 0.6,
             });
@@ -90,27 +98,32 @@ export const Route = createFileRoute('/sitemap.xml')({
             title: row.title || row.slug,
             description: row.description || '',
             createdAt: new Date(row.createdAt).toISOString(),
+            updatedAt: new Date(row.updatedAt).toISOString(),
             source: 'db' as const,
           }));
-          const posts = mergePosts(dbPosts, getLocalPosts(baseLocale));
-          for (const post of posts) {
-            entries.push({
-              path: `/blog/${encodeURIComponent(post.slug)}`,
-              lastModified: post.createdAt,
-              changeFrequency: 'monthly',
-              priority: 0.6,
-            });
-          }
+          posts = mergePosts(dbPosts, localPosts);
         } catch {
-          // Database unreachable — static paths + local posts still listed.
-          for (const post of getLocalPosts(baseLocale)) {
-            entries.push({
-              path: `/blog/${encodeURIComponent(post.slug)}`,
-              lastModified: post.createdAt,
-              changeFrequency: 'monthly',
-              priority: 0.6,
-            });
-          }
+          // Keep static pages and local posts available during a database outage.
+        }
+
+        let blogLastModified = '';
+        for (const post of posts) {
+          const lastModified = (post.updatedAt ?? post.createdAt).slice(0, 10);
+          if (lastModified > blogLastModified) blogLastModified = lastModified;
+          entries.push({
+            path: `/blog/${encodeURIComponent(post.slug)}`,
+            lastModified,
+            changeFrequency: 'monthly',
+            priority: 0.6,
+          });
+        }
+        if (blogLastModified) {
+          entries.push({
+            path: '/blog',
+            lastModified: blogLastModified,
+            changeFrequency: 'weekly',
+            priority: 0.8,
+          });
         }
 
         const origin = serverSiteOrigin();

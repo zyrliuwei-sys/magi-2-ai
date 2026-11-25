@@ -11,12 +11,17 @@ import { baseLocale } from '@/paraglide/runtime.js';
  * fetched through the server functions in ./server.ts and merged with the
  * local posts via the pure helpers below.
  */
-export const BLOG_POST_SLUGS: readonly string[] = [];
+export const BLOG_POST_SLUGS: readonly string[] = [
+  'magi-2-vs-magi-1',
+  'write-a-magi-2-prompt',
+  'try-magi-2-sand-ai-higgsfield',
+];
 
 export type BlogPostMeta = {
   title: string;
   description: string;
   created_at: string;
+  updated_at?: string;
   author_name?: string;
   author_image?: string;
   image?: string;
@@ -34,6 +39,7 @@ export type BlogPost = {
   image?: string;
   /** ISO date string — serializable across loader/server-fn boundaries */
   createdAt: string;
+  updatedAt?: string;
   authorName?: string;
   authorImage?: string;
   source: 'local' | 'db';
@@ -84,6 +90,7 @@ function localPostToItem(slug: string, meta: BlogPostMeta): BlogPost {
     description: meta.description,
     image: meta.image,
     createdAt: new Date(meta.created_at).toISOString(),
+    updatedAt: meta.updated_at,
     authorName: meta.author_name,
     authorImage: meta.author_image,
     source: 'local',

@@ -3,6 +3,7 @@ declare module '*.mdx' {
 
   export const meta: {
     title: string;
+    seo_title?: string;
     description: string;
     updated_at: string;
   };

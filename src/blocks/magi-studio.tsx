@@ -43,6 +43,8 @@ import { m } from '@/paraglide/messages.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
 import { MagiVideoPreview } from '@/components/magi-video-preview';
 
+import { MagiLink } from './magi-site';
+
 const draftKey = 'magi-video-draft';
 const creditNumber = new Intl.NumberFormat('en-US');
 const defaultSettings: VideoSettings = {
@@ -87,7 +89,7 @@ export function VideoDownload({ url }: { url: string }) {
       <a
         href={url}
         target="_blank"
-        rel="noopener noreferrer"
+        rel="nofollow noopener"
         className="magi-text-link"
       >
         {m['video.studio.mp4']()} <ArrowUpRight size={14} />
@@ -192,6 +194,7 @@ export function MagiStudio({
       ? () => setReferenceIndex((i) => (i + 1) % references.length)
       : undefined;
   const inputImage = settings.mode === 'image-to-video' ? imageUrl : undefined;
+  const showModelPreview = preview === 'home' && !job?.url && !inputImage;
 
   useEffect(() => {
     const saved = jobQuery.data;
@@ -561,7 +564,11 @@ export function MagiStudio({
         <div className="magi-preview-top">
           <div className="magi-panel-heading">
             <Film size={19} />
-            <h2>{m['video.studio.preview']()}</h2>
+            <h2>
+              {showModelPreview
+                ? m['video.studio.model_preview']()
+                : m['video.studio.preview']()}
+            </h2>
           </div>
           <span className="magi-format">
             {job?.settings.resolution ?? settings.resolution} <span>/</span>{' '}
@@ -571,6 +578,14 @@ export function MagiStudio({
               : (job?.settings.ratio ?? settings.ratio)}
           </span>
         </div>
+        {showModelPreview && (
+          <div className="magi-preview-context">
+            <p>{m['video.studio.model_preview_description']()}</p>
+            <MagiLink href="/magi-2-preview">
+              {m['video.nav.model_preview']()}
+            </MagiLink>
+          </div>
+        )}
         <div
           className="magi-viewer"
           data-composition={!job?.url && !inputImage ? true : undefined}
@@ -623,16 +638,13 @@ export function MagiStudio({
                 ) : (
                   <a
                     className="magi-text-link"
-                    href={reference.source}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="#magi-sources"
                   >
                     {reference.publisher === 'sand'
                       ? m['video.gallery.official']()
                       : reference.publisher === 'higgsfield'
                         ? m['video.gallery.higgsfield.source']()
-                        : m['video.media.pexels']()}{' '}
-                    <ArrowUpRight size={13} />
+                        : m['video.media.pexels']()}
                   </a>
                 )}
               </span>

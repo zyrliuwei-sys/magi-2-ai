@@ -1,6 +1,9 @@
 import type { VideoMode } from './magi-video';
 
-export const sandMagiAnnouncement = 'https://sand.ai/blog/magi-2';
+export const sandMagiAnnouncement = 'https://sand.ai/blog/magi-2/';
+export const sandMagiPreview = 'https://sand.ai/blog/magi-2-preview';
+export const sandMagiPreviewRepo = 'https://github.com/SandAI-org/MAGI-2-preview';
+export const sandMagiSite = 'https://sand.ai/';
 export const higgsfieldMagiIntro = 'https://higgsfield.ai/magi-2-intro';
 export const higgsfieldMagiDocs =
   'https://open.higgsfield.ai/models/sand/magi-2/text-to-video/api-reference';

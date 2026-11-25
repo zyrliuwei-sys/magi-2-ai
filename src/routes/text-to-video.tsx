@@ -6,10 +6,10 @@ import { MagiInsight } from '@/blocks/magi-editorial';
 import {
   MagiFAQ,
   MagiGallery,
-  MagiHow,
   MagiPromptLibrary,
 } from '@/blocks/magi-library';
-import { magiHead, MagiIntro, MagiSite } from '@/blocks/magi-site';
+import { magiHead, MagiIntro, MagiLink, MagiSite } from '@/blocks/magi-site';
+import { MagiSources } from '@/blocks/magi-sources';
 import { MagiStudio, parseStudioSearch } from '@/blocks/magi-studio';
 
 function ToolPage() {
@@ -32,9 +32,12 @@ function ToolPage() {
         />
         <MagiPromptLibrary compact mode="text-to-video" />
         <MagiGallery collection="text" />
-        <MagiHow />
+        <p className="magi-section">
+          <MagiLink href="/examples">{m['video.gallery.study']()}</MagiLink>
+        </p>
         <MagiInsight page="text" />
-        <MagiFAQ />
+        <MagiFAQ page="text" />
+        <MagiSources page="text" />
       </div>
     </MagiSite>
   );

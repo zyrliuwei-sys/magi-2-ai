@@ -45,6 +45,7 @@ export type PublishedArticleItem = Pick<
   | 'authorName'
   | 'authorImage'
   | 'createdAt'
+  | 'updatedAt'
   | 'type'
 >;
 
@@ -121,6 +122,7 @@ export async function listPublishedArticles(
       authorName: post.authorName,
       authorImage: post.authorImage,
       createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
       type: post.type,
     })
     .from(post)

@@ -487,6 +487,15 @@
 .magi-preview-top h2 {
   color: var(--magi-ink);
 }
+.magi-preview-context {
+  margin: 0 2px 14px;
+  color: var(--magi-muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+.magi-preview-context a {
+  margin-top: 6px;
+}
 .magi-format {
   white-space: nowrap;
   font-size: 0.72rem;
@@ -711,6 +720,10 @@
 }
 .magi-source {
   margin-top: 16px;
+}
+.magi-related .magi-inline-links,
+.magi-sources .magi-inline-links {
+  margin-top: 12px;
 }
 .magi-dialog {
   width: min(800px, 100% - 32px);
@@ -1026,6 +1039,36 @@
 .magi-guide-article .magi-inline-links {
   margin-top: 10px;
 }
+.magi-preview-article {
+  max-width: 920px;
+  margin-inline: auto;
+}
+.magi-preview-article > h2 {
+  margin: 26px 0 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--magi-line);
+  font-family: var(--brand-display);
+  font-size: clamp(1.85rem, 3.6vw, 2.7rem);
+  line-height: 1.12;
+}
+.magi-preview-article > h3 {
+  margin-top: 18px;
+  font-weight: 600;
+}
+.magi-preview-article > p {
+  margin-top: 8px;
+  color: var(--magi-muted);
+  line-height: 1.65;
+}
+.magi-preview-prompt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 285px), 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+.magi-preview-article .magi-faq {
+  grid-template-columns: minmax(0, 1fr);
+}
 
 .magi-footer {
   border-top: 1px solid var(--magi-line);
@@ -1096,18 +1139,21 @@
   margin-top: 12px;
 }
 
+@media (max-width: 1120px) {
+  .magi-desktop-nav {
+    display: none;
+  }
+  .magi-mobile-nav {
+    display: block;
+  }
+}
+
 @media (max-width: 950px) {
   .magi-wrap {
     width: min(100% - 48px, 1260px);
   }
   .magi-header-actions {
     gap: 12px;
-  }
-  .magi-desktop-nav {
-    display: none;
-  }
-  .magi-mobile-nav {
-    display: block;
   }
   .magi-workbench {
     grid-template-columns: minmax(284px, 0.92fr) minmax(0, 1.08fr);

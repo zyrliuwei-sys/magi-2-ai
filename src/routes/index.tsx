@@ -12,6 +12,7 @@ import {
 } from '@/blocks/magi-library';
 import { MagiPricing } from '@/blocks/magi-pricing';
 import { magiHead, MagiHomeIntro, MagiSite } from '@/blocks/magi-site';
+import { MagiSources } from '@/blocks/magi-sources';
 import { MagiStudio, parseStudioSearch } from '@/blocks/magi-studio';
 
 function HomePage() {
@@ -34,7 +35,8 @@ function HomePage() {
         <MagiPromptLibrary compact />
         <MagiEditorial />
         <MagiPricing embedded />
-        <MagiFAQ />
+        <MagiFAQ page="home" />
+        <MagiSources page="home" />
       </div>
     </MagiSite>
   );

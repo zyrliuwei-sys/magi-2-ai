@@ -202,3 +202,38 @@ export function MagiLink({
     </Link>
   );
 }
+
+const relatedTopics = {
+  examples: ['examples', '/examples'],
+  text: ['text', '/text-to-video'],
+  image: ['image', '/image-to-video'],
+  guide: ['guide', '/guide'],
+  prompts: ['prompts', '/prompts'],
+  preview: ['model_preview', '/magi-2-preview'],
+} as const;
+
+export function MagiRelated({
+  topics,
+}: {
+  topics: readonly (keyof typeof relatedTopics)[];
+}) {
+  return (
+    <section className="magi-section magi-related" aria-labelledby="magi-related">
+      <h2 id="magi-related">{m['video.related.title']()}</h2>
+      <ul className="magi-inline-links">
+        {topics.map((topic) => {
+          const [label, href] = relatedTopics[topic];
+          return (
+            <li key={topic}>
+              <MagiLink href={href}>
+                {label === 'text' || label === 'image'
+                  ? m[`video.studio.${label}`]()
+                  : m[`video.nav.${label}`]()}
+              </MagiLink>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}

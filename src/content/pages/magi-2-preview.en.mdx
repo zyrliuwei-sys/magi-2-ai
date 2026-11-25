@@ -1,0 +1,88 @@
+export const meta = {
+  title: 'MAGI-2 Preview',
+  seo_title: "MAGI-2 Preview: Sand.ai's New Video Model (Examples & How to Try)",
+  description: 'See what Sand.ai’s MAGI-2 Preview shows about character, camera movement, and dialogue. Compare it with MAGI-1 and copy five example prompts.',
+  updated_at: '2026-11-25',
+};
+
+export const prompts = [
+  {
+    title: 'Character across a turn',
+    text: 'Medium shot of a clockmaker with a green apron and silver-rimmed glasses at a workbench. She raises a brass watch, turns toward the window, and smiles at the ticking. Keep her glasses and apron consistent as the camera arcs to her profile. End on her hand closing the watch.',
+  },
+  {
+    title: 'A camera move motivated by action',
+    text: 'Begin on a wide view of an empty tram stop after rain. A tram enters from the right. Track left alongside it at walking pace as the doorway lines up with the shelter. End with the open door centered and keep the move continuous. Add a soft bell and wet tire noise.',
+  },
+  {
+    title: 'Two lines and a pause',
+    text: 'Two bicycle mechanics stand on opposite sides of a bench. Hold a medium two-shot. The mechanic on the left asks, “Did you hear that click?” Pause for one beat. The mechanic on the right turns the wheel and replies, “It only happens under load.” Keep the fan low in the background.',
+  },
+  {
+    title: 'Product detail in one take',
+    text: 'Use the supplied photograph as the first frame. Slowly push toward the dial of a blue kitchen timer on cream tile. Keep the numerals and pointer legible as a thin shadow moves across the surface. Near the last frame the timer clicks once, with no music.',
+  },
+  {
+    title: 'Cut on movement',
+    text: 'Open with a wide shot of a potter lifting a small bowl from a shelf. As the bowl passes in front of their face, cut to a close-up that carries the same upward motion. End on the rim catching the window light. Keep the bowl shape and glaze consistent across the cut.',
+  },
+];
+
+## What the official preview shows
+
+### Character performance
+
+Watch how expression, eye movement, and body language develop together. Check what happens when a character looks away or turns into profile. A consistent silhouette and wardrobe make the performance easier to follow across changing angles.
+
+### Camera movement
+
+Read the first frame before following the camera. Identify the subject and the background lines that establish depth. Then note when the camera starts moving and whether it follows the subject, reveals something new, or ends on a detail.
+
+### Dialogue and sound
+
+Listen for a spoken line while watching the mouth and the listener’s reaction. A pause, a glance, or a change in room tone can mark the end of one beat before the next starts. Watch once with sound and once with captions or a transcript where available.
+
+## How MAGI-2 Preview differs from MAGI-1
+
+MAGI-1 generates video in sequential chunks for streaming and continuation. The August 2026 MAGI-2 Preview is a research release that scales a single model for both picture and sound. It uses a mixture-of-experts architecture to route each part of the input through a subset of the model.
+
+Sand.ai’s November flagship announcement describes a later MAGI-2 model with multimodal reference inputs and more timeline control. Check which release or hosted model a demo uses before comparing it with the research preview.
+
+## Five copyable MAGI-2 prompts
+
+These are original shot briefs. Where a prompt calls for a reference image, supply your own starting frame in an interface that supports it.
+
+<div className="magi-preview-prompt-grid">
+  {prompts.map(({ title, text }) => (
+    <article className="magi-prompt-card" key={title}>
+      <h3>{title}</h3>
+      <p>{text}</p>
+      <div className="magi-prompt-actions">
+        <MagiCopyPrompt text={text} />
+      </div>
+    </article>
+  ))}
+</div>
+
+## How to try MAGI-2
+
+**Sand.ai.** Open the research preview or full announcement in Sources to study the original examples. For a hosted workflow, follow the official partner link on Sand.ai’s homepage and check the model available there. To run the research preview yourself, use Sand.ai’s Preview repository and its instructions for acquiring the weights and running the sample batch.
+
+**Higgsfield.** Open the model showcase in Sources and choose **Try MAGI-2**. Select the model and sign in if prompted. Paste a shot brief, add supported references when needed, and review the settings and cost before you render.
+
+## MAGI-2 Preview FAQ
+
+<div className="magi-faq">
+  <details>
+    <summary>Is the research preview the same release as the hosted flagship?</summary>
+    <p>The August preview and November flagship are separate releases. Check the model label in your interface and use that version’s controls when repeating a shot.</p>
+  </details>
+  <details>
+    <summary>Do I need reference media to use the example prompts?</summary>
+    <p>Four of the briefs work as text-only scenes. The product detail brief assumes you can supply a photograph as the first frame.</p>
+  </details>
+  <details>
+    <summary>Can I compare a demo with a render from a different model?</summary>
+    <p>Yes. Record the model, input, duration, and sound settings for both clips. Keep them consistent where possible, then compare the same action or frame in each result.</p>
+  </details>
+</div>

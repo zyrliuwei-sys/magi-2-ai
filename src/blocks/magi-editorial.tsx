@@ -1,19 +1,15 @@
 import { useRef, useState } from 'react';
-import { ArrowUpRight, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { flushSync } from 'react-dom';
 
-import {
-  higgsfieldMagiDocs,
-  magiGuideClips,
-  sandMagiAnnouncement,
-} from '@/config/magi-content';
+import { magiGuideClips } from '@/config/magi-content';
 import { m } from '@/paraglide/messages.js';
 import { MagiVideoPreview } from '@/components/magi-video-preview';
 
 import { MagiLink } from './magi-site';
 
 const chapters = [
-  ['overview', sandMagiAnnouncement],
+  ['overview', '/magi-2-preview'],
   ['text', '/text-to-video'],
   ['image', '/image-to-video'],
   ['audio', '/guide#sound'],
@@ -71,15 +67,9 @@ function ChapterVideo({ chapter }: { chapter: keyof typeof magiGuideClips }) {
           <strong>{title}</strong>
           <p>{m[`video.article.media.${chapter}.note`]()}</p>
         </div>
-        <a
-          className="magi-text-link"
-          href={clip.source}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {m[`video.article.media.source.${clip.publisher}`]()}{' '}
-          <ArrowUpRight size={14} />
-        </a>
+        <MagiLink href="#magi-sources">
+          {m[`video.article.media.source.${clip.publisher}`]()}
+        </MagiLink>
         {failed && (
           <p className="magi-error" role="status">
             {m['video.article.media.error']()}
@@ -122,34 +112,11 @@ export function MagiEditorial() {
               <h3>{m[`video.article.${key}.title`]()}</h3>
               <p>{m[`video.article.${key}.p1`]()}</p>
               <p>{m[`video.article.${key}.p2`]()}</p>
-              {key === 'overview' ? (
-                <div className="magi-inline-links">
-                  <a className="magi-text-link" href={href}>
-                    {m[`video.article.${key}.link`]()}{' '}
-                    <ArrowUpRight size={15} />
-                  </a>
-                  <a className="magi-text-link" href={higgsfieldMagiDocs}>
-                    {m['video.article.provider']()} <ArrowUpRight size={15} />
-                  </a>
-                </div>
-              ) : (
-                <div className="magi-inline-links">
-                  <MagiLink href={href}>
-                    {m[`video.article.${key}.link`]()}
-                  </MagiLink>
-                  {key === 'format' && (
-                    <a
-                      className="magi-text-link"
-                      href="https://www.youtube.com/watch?v=lctGwH4wZ1o"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {m['video.article.format.tutorial']()}{' '}
-                      <ArrowUpRight size={15} />
-                    </a>
-                  )}
-                </div>
-              )}
+              <div className="magi-inline-links">
+                <MagiLink href={href}>
+                  {m[`video.article.${key}.link`]()}
+                </MagiLink>
+              </div>
             </div>
             <ChapterVideo chapter={key} />
           </section>

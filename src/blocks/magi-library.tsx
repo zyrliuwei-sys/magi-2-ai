@@ -13,21 +13,19 @@ import {
 import { flushSync } from 'react-dom';
 
 import {
-  higgsfieldMagiDocs,
-  higgsfieldMagiIntro,
   magiExamples,
   magiGuides,
   magiHiggsfieldExamples,
   magiPrompts,
   magiReferences,
   magiStudioClips,
-  sandMagiAnnouncement,
   type MagiPromptId,
 } from '@/config/magi-content';
 import { m } from '@/paraglide/messages.js';
 import { MagiVideoPreview } from '@/components/magi-video-preview';
 
-import { MagiIntro, MagiLink } from './magi-site';
+import { MagiIntro, MagiLink, MagiRelated } from './magi-site';
+import { MagiSources } from './magi-sources';
 
 export function StudioPromptLink({
   id,
@@ -53,10 +51,22 @@ export function StudioPromptLink({
 type GalleryClip =
   (typeof magiExamples)[number] | ReturnType<typeof magiReferences>[number];
 
+const showcaseSummaries: Partial<Record<GalleryClip['id'], () => string>> = {
+  'storm-wings': m['video.example.storm-wings.summary'],
+  'ember-vortex': m['video.example.ember-vortex.summary'],
+  'solar-guardian': m['video.example.solar-guardian.summary'],
+};
+
 function galleryTitle(clip: GalleryClip) {
   return clip.kind === 'model'
     ? m[`video.example.${clip.id}.title`]()
     : m[`video.reference.${clip.id}.title`]();
+}
+
+function galleryDescription(clip: GalleryClip, showcase: boolean) {
+  if (clip.kind === 'stock') return m[`video.reference.${clip.id}.description`]();
+  const summary = showcase ? showcaseSummaries[clip.id] : undefined;
+  return summary?.() ?? m[`video.example.${clip.id}.description`]();
 }
 
 export function MagiGallery({
@@ -114,7 +124,9 @@ export function MagiGallery({
                 : m[`video.gallery.references.${collection}`]()}
             </p>
           </div>
-          <MagiLink href="/examples">{m['video.gallery.all']()}</MagiLink>
+          {!showcase && (
+            <MagiLink href="/examples">{m['video.gallery.all']()}</MagiLink>
+          )}
         </div>
       ) : (
         <div
@@ -176,30 +188,15 @@ export function MagiGallery({
                 </span>
               </div>
               {clip.kind === 'model' && (
-                <p>{m[`video.example.${clip.id}.description`]()}</p>
+                <p>{galleryDescription(clip, showcase)}</p>
               )}
             </article>
           );
         })}
       </div>
-      {!compact && (
+      {showcase && (
         <div className="magi-inline-links magi-source">
-          <a
-            className="magi-text-link"
-            href={sandMagiAnnouncement}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {m['video.gallery.official']()} <ArrowUpRight size={15} />
-          </a>
-          <a
-            className="magi-text-link"
-            href={higgsfieldMagiIntro}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {m['video.gallery.higgsfield.source']()} <ArrowUpRight size={15} />
-          </a>
+          <MagiLink href="/examples">{m['video.gallery.all']()}</MagiLink>
         </div>
       )}
       <dialog
@@ -242,20 +239,14 @@ export function MagiGallery({
                   {m['video.article.media.error']()}
                 </p>
               )}
-              {selected.kind === 'model' ? (
-                <>
-                  <p>{m[`video.example.${selected.id}.description`]()}</p>
-                  {selected.publisher === 'sand' && (
-                    <p>
-                      <strong>{m['video.gallery.input']()}</strong>
-                      <br />
-                      {m[`video.example.${selected.id}.input`]()}{' '}
-                      {m['video.gallery.unpublished']()}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p>{m[`video.reference.${selected.id}.description`]()}</p>
+              <p>{galleryDescription(selected, showcase)}</p>
+              {selected.kind === 'model' && selected.publisher === 'sand' && (
+                <p>
+                  <strong>{m['video.gallery.input']()}</strong>
+                  <br />
+                  {m[`video.example.${selected.id}.input`]()}{' '}
+                  {m['video.gallery.unpublished']()}
+                </p>
               )}
               <div className="magi-inline-links">
                 {selected.prompt && (
@@ -263,28 +254,16 @@ export function MagiGallery({
                     {m['video.gallery.prompt']()}
                   </StudioPromptLink>
                 )}
-                {selected.kind === 'model' && (
-                  <a
-                    className="magi-text-link"
-                    href={selected.video}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {m['video.gallery.fallback']()} <ArrowUpRight size={15} />
-                  </a>
-                )}
                 <a
                   className="magi-text-link"
-                  href={selected.source}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="#magi-sources"
+                  onClick={() => dialog.current?.close()}
                 >
                   {selected.kind === 'model'
                     ? selected.publisher === 'higgsfield'
                       ? m['video.gallery.higgsfield.source']()
                       : m['video.gallery.official']()
                     : m['video.media.pexels']()}{' '}
-                  <ArrowUpRight size={15} />
                 </a>
               </div>
             </div>
@@ -295,8 +274,35 @@ export function MagiGallery({
   );
 }
 
-function PromptCard({ prompt }: { prompt: (typeof magiPrompts)[number] }) {
+export function MagiCopyPrompt({ text }: { text: string }) {
   const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle');
+  return (
+    <>
+      <button
+        type="button"
+        className="magi-button magi-button-outline"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            setCopy('copied');
+          } catch {
+            setCopy('failed');
+          }
+        }}
+      >
+        {copy === 'copied' ? <Check size={15} /> : <Copy size={15} />}
+        {copy === 'copied'
+          ? m['video.prompts.copied']()
+          : m['video.prompts.copy']()}
+      </button>
+      {copy === 'failed' && (
+        <p role="status">{m['video.prompts.copy_failed']()}</p>
+      )}
+    </>
+  );
+}
+
+function PromptCard({ prompt }: { prompt: (typeof magiPrompts)[number] }) {
   const text = m[`video.prompt.${prompt.id}.text`]();
   const Icon = prompt.mode === 'image-to-video' ? ImagePlus : Clapperboard;
   return (
@@ -310,27 +316,8 @@ function PromptCard({ prompt }: { prompt: (typeof magiPrompts)[number] }) {
         <StudioPromptLink id={prompt.id}>
           {m['video.prompts.use']()}
         </StudioPromptLink>
-        <button
-          type="button"
-          className="magi-button magi-button-outline"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(text);
-              setCopy('copied');
-            } catch {
-              setCopy('failed');
-            }
-          }}
-        >
-          {copy === 'copied' ? <Check size={15} /> : <Copy size={15} />}
-          {copy === 'copied'
-            ? m['video.prompts.copied']()
-            : m['video.prompts.copy']()}
-        </button>
+        <MagiCopyPrompt text={text} />
       </div>
-      {copy === 'failed' && (
-        <p role="status">{m['video.prompts.copy_failed']()}</p>
-      )}
     </article>
   );
 }
@@ -365,7 +352,11 @@ export function MagiPromptLibrary({
         <div className="magi-section-heading">
           <div>
             <h2>{m['video.prompts.home_title']()}</h2>
-            <p>{m['video.prompts.home_description']()}</p>
+            <p>
+              {mode
+                ? m['video.prompts.tool_description']()
+                : m['video.prompts.home_description']()}
+            </p>
           </div>
           <MagiLink href="/prompts">{m['video.studio.templates']()}</MagiLink>
         </div>
@@ -432,24 +423,25 @@ export function MagiHow() {
   );
 }
 
-export function MagiFAQ() {
-  const keys = [
-    'model',
-    'audio',
-    'length',
-    'image',
-    'credits',
-    'free',
-    'retention',
-  ] as const;
+const faqTopics = {
+  home: ['model', 'publisher', 'official', 'generator'],
+  text: ['image', 'format', 'credits', 'retention'],
+  image: ['image', 'format', 'credits', 'retention'],
+} as const;
+
+export function MagiFAQ({ page }: { page: keyof typeof faqTopics }) {
+  const topics =
+    page === 'home'
+      ? faqTopics.home.map((key) => `video.faq.home.${key}` as const)
+      : faqTopics[page].map((key) => `video.faq.${page}.${key}` as const);
   return (
     <section className="magi-section magi-faq">
-      <h2>{m['video.faq.title']()}</h2>
+      <h2>{m[`video.faq.${page}.title`]()}</h2>
       <div>
-        {keys.map((key) => (
+        {topics.map((key) => (
           <details key={key}>
-            <summary>{m[`video.faq.${key}.q`]()}</summary>
-            <p>{m[`video.faq.${key}.a`]()}</p>
+            <summary>{m[`${key}.q`]()}</summary>
+            <p>{m[`${key}.a`]()}</p>
           </details>
         ))}
       </div>
@@ -466,6 +458,9 @@ export function MagiGuide() {
       />
       <div className="magi-guide">
         <nav aria-label={m['video.nav.guide']()}>
+          <a className="magi-text-link" href="#study-example">
+            {m['video.guide.study.title']()}
+          </a>
           {magiGuides.map((id) => (
             <a key={id} className="magi-text-link" href={`#${id}`}>
               {m[`video.guide.${id}.title`]()}
@@ -473,6 +468,16 @@ export function MagiGuide() {
           ))}
         </nav>
         <div>
+          <article className="magi-guide-article" id="study-example">
+            <h2>{m['video.guide.study.title']()}</h2>
+            <p>{m['video.guide.study.intro']()}</p>
+            <ol>
+              <li>{m['video.guide.study.frame']()}</li>
+              <li>{m['video.guide.study.motion']()}</li>
+              <li>{m['video.guide.study.adapt']()}</li>
+            </ol>
+            <MagiLink href="/examples">{m['video.nav.examples']()}</MagiLink>
+          </article>
           {magiGuides.map((id, index) => (
             <article key={id} id={id} className="magi-guide-article">
               <h2>{m[`video.guide.${id}.title`]()}</h2>
@@ -492,17 +497,11 @@ export function MagiGuide() {
           <article className="magi-guide-article">
             <h2>{m['video.guide.about.title']()}</h2>
             <p>{m['video.guide.about.text']()}</p>
-            <div className="magi-inline-links">
-              <a className="magi-text-link" href={sandMagiAnnouncement}>
-                {m['video.guide.about.sand']()} <ArrowUpRight size={15} />
-              </a>
-              <a className="magi-text-link" href={higgsfieldMagiDocs}>
-                {m['video.guide.about.hf']()} <ArrowUpRight size={15} />
-              </a>
-            </div>
           </article>
         </div>
       </div>
+      <MagiRelated topics={['examples', 'text', 'image', 'preview']} />
+      <MagiSources page="guide" />
     </div>
   );
 }

@@ -1,0 +1,36 @@
+export const meta = {
+  title: 'Where to Try MAGI-2 on Sand.ai and Higgsfield',
+  description: 'Find the Sand.ai research demo and hosted MAGI-2 generator. Follow a first-render checklist for browser, API, and local preview workflows.',
+  created_at: '2026-11-25',
+};
+
+Start with Sand.ai when you want the original model announcement, the research release, or its official partner link. Open Higgsfield when you want to run the hosted MAGI-2 generator in a browser or through its API. Use the same one-shot brief when comparing workflows so the prompt does not drive the difference.
+
+## Follow Sand.ai’s release and partner links
+
+Open the Sand.ai MAGI-2 launch page in Sources and use **Watch Showcase** to see examples with their documented inputs. To create a hosted clip, the Sand.ai homepage links to its partner through **Try on VidMuse**. Follow that link and check the available model and settings in the partner interface before submitting.
+
+For a local research run, open Sand.ai’s MAGI-2 Preview repository. Use its release-specific instructions to obtain the weights, prepare the GPU environment, and run the shipped sample first. The repository describes the research preview checkpoint. Record its exact version with your output so you can repeat the test later.
+
+## Make a first hosted clip on Higgsfield
+
+1. Open the Higgsfield MAGI-2 showcase in Sources and choose **Try MAGI-2**. Sign in if asked and check the selected model.
+2. Paste a short scene with an opening frame, one camera move, and an ending. For example, ask for a slow pan across an empty theatre as a single work light clicks off.
+3. Set the duration and aspect ratio using the controls shown for your selected mode. If you need a specific visual, add one supported reference and name what it should control.
+4. Review the estimated credit cost before generating. Play the finished clip with sound and check whether the switch and the light change happen at the same moment.
+
+For automation, the Higgsfield API Playground lets you inspect a request before calling it from code. Start with the documented text-to-video input. Add media or switch endpoints after confirming which inputs that endpoint supports. Keep private API credentials on the server.
+
+## Make the next test comparable
+
+Write down the model version shown, prompt, reference type, duration, aspect ratio, and audio setting. Change one setting on the second run. If a provider labels the result “Preview,” record that label too. It can distinguish research weights or a preview offering from the hosted flagship.
+
+Use the [MAGI-2 preview](/magi-2-preview) for copyable shot briefs, or study the [MAGI-2 examples](/examples) before choosing an input. The local studio on this site uses Seedance 2.5 for its own renders.
+
+## Sources
+
+- <a href="https://sand.ai/" rel="nofollow noopener">Sand.ai homepage and partner access</a>
+- <a href="https://sand.ai/blog/magi-2/" rel="nofollow noopener">Sand.ai launch showcase</a>
+- <a href="https://github.com/SandAI-org/MAGI-2-preview" rel="nofollow noopener">MAGI-2 Preview code and weights</a>
+- <a href="https://higgsfield.ai/magi-2-intro" rel="nofollow noopener">Higgsfield hosted MAGI-2 showcase</a>
+- <a href="https://open.higgsfield.ai/models/sand/magi-2/text-to-video/playground" rel="nofollow noopener">Higgsfield API Playground</a>

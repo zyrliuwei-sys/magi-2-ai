@@ -1,0 +1,29 @@
+export const meta = {
+  title: 'MAGI-2 vs. MAGI-1 for Video Generation',
+  description: 'Compare MAGI-1 streaming, MAGI-2 Preview audio-video generation, and the full MAGI-2 release using three practical shot tests.',
+  created_at: '2026-11-25',
+};
+
+MAGI-1 and MAGI-2 address different stages of a video workflow. MAGI-1 introduced a way to generate and extend a video in sequential chunks. The MAGI-2 research preview explores how an audio-video model can scale, including whether sound and motion stay coordinated as a scene grows more complex. The full MAGI-2 release adds media references, timeline control, and editing.
+
+## Three versions to distinguish
+
+**MAGI-1.** The MAGI-1 paper describes causal denoising across chunks. Each new part can build on the video already produced, supporting streaming and continuation. Think of a shot that already starts with a cyclist crossing a bridge. The next chunk has to carry forward the direction, speed, and scene.
+
+**MAGI-2 Preview.** Sand.ai’s August research release scales a single-stream audio-video model to about 114 billion total parameters, with about 6 billion active per token. It uses a mixture-of-experts architecture so the model can choose a portion of its capacity for each token. The [MAGI-2 preview](/magi-2-preview) explains what to watch for in the research demos.
+
+**MAGI-2 flagship.** The November release describes up to 30 seconds of 1080p audio-video in one pass, with image, video, and audio references. The model also accepts instructions about when to cut or edit a shot. Hosted interfaces can expose a different subset of controls, so compare the model name and available inputs before drawing conclusions.
+
+## Compare the same shot under three conditions
+
+1. **Continue a move.** Start with a short shot of the cyclist approaching the first bridge pillar. Ask for another few seconds. Check whether the wheels keep moving in the same direction and whether the far railing stays on the same side.
+2. **Coordinate a sound.** Film or describe a metal gate that closes as the cyclist passes. Listen for the latch at the moment it touches the frame. A sound that starts noticeably before contact changes how the motion reads.
+3. **Keep a character consistent.** Use a three-quarter image to define a raincoat and helmet. Compare the opening angle with an ending close-up. Check the shape of the helmet, the coat’s zipper, and whether the cropped framing still resembles the reference.
+
+Keep duration, framing, and instructions consistent where the two interfaces allow it. Write down which settings you could match and which you could only approximate. For visual references, the [MAGI-2 examples](/examples) include continuous style changes and edited shots you can inspect separately.
+
+## Sources
+
+- <a href="https://github.com/SandAI-org/MAGI-1" rel="nofollow noopener">Sand.ai’s MAGI-1 repository and paper</a>
+- <a href="https://sand.ai/blog/magi-2-preview" rel="nofollow noopener">Sand.ai’s MAGI-2 Preview research release</a>
+- <a href="https://sand.ai/blog/magi-2/" rel="nofollow noopener">Sand.ai’s full MAGI-2 release</a>
