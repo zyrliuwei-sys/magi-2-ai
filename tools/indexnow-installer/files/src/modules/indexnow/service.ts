@@ -147,11 +147,16 @@ export async function submitUrls(
           'User-Agent': `IndexNowClient (+${siteOrigin()})`,
         },
         body,
-        redirect: 'error',
+        // Workers support manual redirects. Keep the submission on the
+        // configured endpoints rather than forwarding its key to a redirect.
+        redirect: 'manual',
         signal: AbortSignal.timeout(10_000),
       });
       status = response.status;
-      meaning = MEANINGS[status] ?? `Search engine returned HTTP ${status}`;
+      meaning =
+        status >= 300 && status < 400
+          ? 'Search engine redirected the request'
+          : MEANINGS[status] ?? `Search engine returned HTTP ${status}`;
       await response.body?.cancel();
     } catch {
       // Never return a provider body or error that could echo the key.

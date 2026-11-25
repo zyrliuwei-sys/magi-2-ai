@@ -328,7 +328,11 @@ function IndexNowPage() {
           {result && (
             <div className="bg-muted space-y-1 rounded-md p-3 text-sm">
               <p className="font-medium">
-                {m['admin.indexnow.result_count']({ count: result.submitted })}
+                {result.results.every((r) => r.ok)
+                  ? m['admin.indexnow.result_count']({ count: result.submitted })
+                  : m['admin.indexnow.result_attempted']({
+                      count: result.submitted,
+                    })}
               </p>
               {result.results.flatMap((r, i) =>
                 r.attempts.map((a, j) => (
