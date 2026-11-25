@@ -8,6 +8,8 @@ declare module '*.mdx' {
     updated_at: string;
   };
 
+  export const faqEntries: readonly { question: string; answer: string }[];
+
   const MDXComponent: ComponentType<{
     components?: Record<string, ComponentType<any>>;
   }>;

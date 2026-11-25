@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import { Link as RouterLink } from '@tanstack/react-router';
+import { Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import {
   ArrowUpRight,
   Check,
@@ -27,6 +27,12 @@ import { MagiVideoPreview } from '@/components/magi-video-preview';
 import { MagiIntro, MagiLink, MagiRelated } from './magi-site';
 import { MagiSources } from './magi-sources';
 
+function studioPromptTarget(id: MagiPromptId) {
+  const mode = magiPrompts.find((prompt) => prompt.id === id)?.mode;
+  const to = mode === 'image-to-video' ? '/image-to-video' : '/text-to-video';
+  return { to, search: { prompt: id }, hash: 'studio' };
+}
+
 export function StudioPromptLink({
   id,
   children,
@@ -34,14 +40,8 @@ export function StudioPromptLink({
   id: MagiPromptId;
   children: React.ReactNode;
 }) {
-  const mode = magiPrompts.find((prompt) => prompt.id === id)?.mode;
   return (
-    <RouterLink
-      to={mode === 'image-to-video' ? '/image-to-video' : '/text-to-video'}
-      search={{ prompt: id }}
-      hash="studio"
-      className="magi-text-link"
-    >
+    <RouterLink {...studioPromptTarget(id)} className="magi-text-link">
       {children}
       <ArrowUpRight size={15} />
     </RouterLink>
@@ -64,7 +64,8 @@ function galleryTitle(clip: GalleryClip) {
 }
 
 function galleryDescription(clip: GalleryClip, showcase: boolean) {
-  if (clip.kind === 'stock') return m[`video.reference.${clip.id}.description`]();
+  if (clip.kind === 'stock')
+    return m[`video.reference.${clip.id}.description`]();
   const summary = showcase ? showcaseSummaries[clip.id] : undefined;
   return summary?.() ?? m[`video.example.${clip.id}.description`]();
 }
@@ -450,6 +451,8 @@ export function MagiFAQ({ page }: { page: keyof typeof faqTopics }) {
 }
 
 export function MagiGuide() {
+  const navigate = useNavigate();
+
   return (
     <div className="magi-wrap">
       <MagiIntro
@@ -487,11 +490,19 @@ export function MagiGuide() {
                   <li key={step}>{m[`video.guide.${id}.step${step}`]()}</li>
                 ))}
               </ol>
-              <StudioPromptLink
-                id={(['orbit', 'night', 'dialogue'] as const)[index]}
+              <button
+                type="button"
+                className="magi-text-link"
+                onClick={() =>
+                  void navigate(
+                    studioPromptTarget(
+                      (['orbit', 'night', 'dialogue'] as const)[index]
+                    )
+                  )
+                }
               >
-                {m['video.prompts.use']()}
-              </StudioPromptLink>
+                {m['video.prompts.use']()} <ArrowUpRight size={15} />
+              </button>
             </article>
           ))}
           <article className="magi-guide-article">

@@ -8,6 +8,9 @@ Use the configured application name for branding. Do not add upstream vendor
 branding, promotional badges, or template demonstration articles to product
 copy. Keep the original license and compatibility identifiers intact.
 
+Use canonical URLs without query parameters for campaigns, backlinks, and
+social posts. Reserve `?prompt=` URLs for in-site template actions.
+
 ## Language policy
 
 This project is English-only. `project.inlang/settings.json` enables only `en`.

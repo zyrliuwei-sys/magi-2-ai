@@ -1,7 +1,8 @@
 export const meta = {
   title: 'MAGI-2 Preview',
-  seo_title: "MAGI-2 Preview: Sand.ai's New Video Model (Examples & How to Try)",
-  description: 'See what Sand.ai’s MAGI-2 Preview shows about character, camera movement, and dialogue. Compare it with MAGI-1 and copy five example prompts.',
+  seo_title: "MAGI-2 Preview: Sand.ai's New Video Model (Examples)",
+  description:
+    'See what Sand.ai’s MAGI-2 Preview shows about character, camera movement, and dialogue. Compare it with MAGI-1 and copy five example prompts.',
   updated_at: '2026-11-25',
 };
 
@@ -28,25 +29,52 @@ export const prompts = [
   },
 ];
 
+export const faqEntries = [
+  {
+    question:
+      'Is the research preview the same release as the hosted flagship?',
+    answer:
+      'The August preview and November flagship are separate releases. Check the model label in your interface and use that version’s controls when repeating a shot.',
+  },
+  {
+    question: 'Do I need reference media to use the example prompts?',
+    answer:
+      'Four of the briefs work as text-only scenes. The product detail brief assumes you can supply a photograph as the first frame.',
+  },
+  {
+    question: 'Can I compare a demo with a render from a different model?',
+    answer:
+      'Yes. Record the model, input, duration, and sound settings for both clips. Keep them consistent where possible, then compare the same action or frame in each result.',
+  },
+];
+
 ## What the official preview shows
 
 ### Character performance
 
 Watch how expression, eye movement, and body language develop together. Check what happens when a character looks away or turns into profile. A consistent silhouette and wardrobe make the performance easier to follow across changing angles.
 
+On a second pass, choose two details you can track, such as the bridge of a pair of glasses and the cuff on a jacket. Compare them before and after a turn. Then watch the hands and eyes separately. A glance that anticipates a gesture can tell you where the character's attention is going before the main action happens.
+
 ### Camera movement
 
 Read the first frame before following the camera. Identify the subject and the background lines that establish depth. Then note when the camera starts moving and whether it follows the subject, reveals something new, or ends on a detail.
 
+Use a background object as a reference point. In a sideways tracking shot, a nearby post moves across the frame faster than a distant building. In a pan, the camera can reveal more of the scene while staying in place. That difference helps you choose between instructions like “track alongside the tram” and “pan from the shelter to the tram.”
+
 ### Dialogue and sound
 
 Listen for a spoken line while watching the mouth and the listener’s reaction. A pause, a glance, or a change in room tone can mark the end of one beat before the next starts. Watch once with sound and once with captions or a transcript where available.
+
+Replay the moment a speaker finishes a line. Check where the listener is looking, how long the pause lasts, and whether the background sound carries through it. For an action with a clear sound, such as a latch clicking shut, check the point of contact on screen. That gives you a specific timing instruction you can reuse in a prompt.
 
 ## How MAGI-2 Preview differs from MAGI-1
 
 MAGI-1 generates video in sequential chunks for streaming and continuation. The August 2026 MAGI-2 Preview is a research release that scales a single model for both picture and sound. It uses a mixture-of-experts architecture to route each part of the input through a subset of the model.
 
 Sand.ai’s November flagship announcement describes a later MAGI-2 model with multimodal reference inputs and more timeline control. Check which release or hosted model a demo uses before comparing it with the research preview.
+
+For MAGI-1, a practical test starts with an existing clip and asks whether the next segment continues the motion. For MAGI-2 Preview, try a scene in which an action and a sound need to happen together, such as a hand setting a glass on a countertop. To test the flagship's reference controls, use a still to establish the subject and a supported video reference to show the camera move. These tests help you judge the capability each release was designed to demonstrate.
 
 ## Five copyable MAGI-2 prompts
 
@@ -64,25 +92,38 @@ These are original shot briefs. Where a prompt calls for a reference image, supp
   ))}
 </div>
 
+### Choose a brief for your first test
+
+Use **Character across a turn** if keeping the face and wardrobe consistent matters most. Choose **A camera move motivated by action** if you want a clear starting cue for the camera. In **Two lines and a pause**, give both speakers time to finish and leave the setting simple so you can hear the timing. If you supply an image for **Product detail in one take**, check whether the product fills so much of the image that the push-in would crop the dial.
+
+When adapting **Cut on movement**, write down where the bowl appears in the last wide frame and the first close-up. Keep the lift moving in the same direction across the cut. Change the subject and location together if they depend on each other, then keep the camera instructions fixed while you compare the first two drafts.
+
 ## How to try MAGI-2
 
 **Sand.ai.** Open the research preview or full announcement in Sources to study the original examples. For a hosted workflow, follow the official partner link on Sand.ai’s homepage and check the model available there. To run the research preview yourself, use Sand.ai’s Preview repository and its instructions for acquiring the weights and running the sample batch.
 
 **Higgsfield.** Open the model showcase in Sources and choose **Try MAGI-2**. Select the model and sign in if prompted. Paste a shot brief, add supported references when needed, and review the settings and cost before you render.
 
+Before comparing results, record the exact model label and the options the interface exposes. You can start with a short clip, one camera move, and either a brief line of dialogue or a single sound cue. Save the original prompt alongside the result. If a service expands the prompt before rendering and shows that expansion, save it too so you can see which instructions entered the run.
+
+## Review the first render
+
+Watch the clip from start to finish without pausing. Note the first moment when the action becomes hard to read. Replay just that section and choose one change to test.
+
+1. **The opening frame is unclear.** Specify the shot size and position of the subject. Try placing a concrete object near the subject to give the frame a point of reference.
+2. **The camera starts too early.** Anchor the move to an event the audience can see, such as the tram passing the shelter or the clockmaker closing the watch.
+3. **The sound lands at the wrong moment.** Attach it directly to the visible action in the prompt. If speech and a sound effect compete, give one of them a short beat of its own.
+4. **The cut changes the subject.** Describe one feature that should carry across the two angles, such as a chipped lid or a folded sleeve.
+
+Keep the original render so you can compare it with the revision. A side-by-side check is easiest when the prompt, reference images, and settings differ in only one deliberate way.
+
 ## MAGI-2 Preview FAQ
 
 <div className="magi-faq">
-  <details>
-    <summary>Is the research preview the same release as the hosted flagship?</summary>
-    <p>The August preview and November flagship are separate releases. Check the model label in your interface and use that version’s controls when repeating a shot.</p>
-  </details>
-  <details>
-    <summary>Do I need reference media to use the example prompts?</summary>
-    <p>Four of the briefs work as text-only scenes. The product detail brief assumes you can supply a photograph as the first frame.</p>
-  </details>
-  <details>
-    <summary>Can I compare a demo with a render from a different model?</summary>
-    <p>Yes. Record the model, input, duration, and sound settings for both clips. Keep them consistent where possible, then compare the same action or frame in each result.</p>
-  </details>
+  {faqEntries.map(({ question, answer }) => (
+    <details key={question}>
+      <summary>{question}</summary>
+      <p>{answer}</p>
+    </details>
+  ))}
 </div>

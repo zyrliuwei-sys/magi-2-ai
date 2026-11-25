@@ -1029,7 +1029,8 @@
   font-size: 0.96rem;
   line-height: 1.6;
 }
-.magi-guide-article ol {
+.magi-guide-article ol,
+.magi-preview-article > ol {
   list-style: decimal;
   padding-inline-start: 21px;
   margin-block: 11px 15px;
@@ -1057,6 +1058,9 @@
 }
 .magi-preview-article > p {
   margin-top: 8px;
+}
+.magi-preview-article > p,
+.magi-preview-article > ol > li {
   color: var(--magi-muted);
   line-height: 1.65;
 }
