@@ -8,6 +8,7 @@ import { envConfigs } from '@/config';
 import { openCookieSettings } from '@/lib/cookie-consent';
 import { m } from '@/paraglide/messages.js';
 import { useUserPermissions } from '@/hooks/use-user-permissions';
+import { FooterBadgeList } from '@/components/footer-badge-list';
 
 export { publicPageHead as magiHead } from '@/lib/seo';
 
@@ -143,6 +144,9 @@ export function MagiFooter() {
           </div>
         </nav>
       </div>
+      <div className="magi-wrap">
+        <FooterBadgeList className="pb-8" showDefaults={false} />
+      </div>
     </footer>
   );
 }
@@ -161,7 +165,8 @@ export function MagiHomeIntro() {
   return (
     <header className="magi-home-intro">
       <h1>
-        <span>{m['video.home.topic']()}</span> <span>{m['video.home.tool']()}</span>
+        <span>{m['video.home.topic']()}</span>{' '}
+        <span>{m['video.home.tool']()}</span>
       </h1>
       <p>{m['video.home.description']()}</p>
       <MagiLink href="#magi-overview">
@@ -218,7 +223,10 @@ export function MagiRelated({
   topics: readonly (keyof typeof relatedTopics)[];
 }) {
   return (
-    <section className="magi-section magi-related" aria-labelledby="magi-related">
+    <section
+      className="magi-section magi-related"
+      aria-labelledby="magi-related"
+    >
       <h2 id="magi-related">{m['video.related.title']()}</h2>
       <ul className="magi-inline-links">
         {topics.map((topic) => {

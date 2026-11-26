@@ -53,7 +53,13 @@ function BadgeRow({
 
 const rootRoute = getRouteApi('__root__');
 
-export function FooterBadgeList({ className }: { className?: string }) {
+export function FooterBadgeList({
+  className,
+  showDefaults = true,
+}: {
+  className?: string;
+  showDefaults?: boolean;
+}) {
   const { data } = usePublicConfig();
   // Server-rendered list from the root loader until the live config arrives.
   const ssrStored = rootRoute.useLoaderData({
@@ -61,7 +67,7 @@ export function FooterBadgeList({ className }: { className?: string }) {
   });
   const stored = data ? data.footer_badges : (ssrStored ?? undefined);
   const badges =
-    stored === undefined
+    stored === undefined && showDefaults
       ? DEFAULT_FOOTER_BADGES
       : parseStoredFooterBadges(stored);
 
