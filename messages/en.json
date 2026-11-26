@@ -1665,6 +1665,7 @@
   "video.pricing.monthly_details": "Renews monthly. Unused plan credits expire at the end of each billing period.",
   "video.pricing.monthly_credits": "{count} credits per month",
   "video.pricing.clip_count": "Up to {count} clips at 480p and 5s",
+  "video.pricing.starter_hd": "Covers one 5-second video at 1080p.",
   "video.pricing.default_format": "480p estimates shown here.",
   "video.pricing.pack.starter": "Starter",
   "video.pricing.pack.creator": "Creator",

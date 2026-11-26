@@ -198,11 +198,14 @@ export function MagiPricing({
                 ]({ count: creditNumber.format(plan.credits) })}
               </p>
               <p>
-                {m['video.pricing.clip_count']({
-                  count: Math.floor(
-                    plan.credits / videoCreditCost(5, DEFAULT_VIDEO_RESOLUTION)
-                  ),
-                })}
+                {!monthly && plan.tier === 'starter'
+                  ? m['video.pricing.starter_hd']()
+                  : m['video.pricing.clip_count']({
+                      count: Math.floor(
+                        plan.credits /
+                          videoCreditCost(5, DEFAULT_VIDEO_RESOLUTION)
+                      ),
+                    })}
               </p>
             </div>
             <button

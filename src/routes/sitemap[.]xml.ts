@@ -7,7 +7,7 @@ import { getLocalPosts, mergePosts } from '@/content/posts';
 // Date of the most recent substantive content edit on each static page.
 const STATIC_LAST_MODIFIED = {
   '': '2026-11-26',
-  '/pricing': '2026-11-25',
+  '/pricing': '2026-11-26',
   '/text-to-video': '2026-11-26',
   '/image-to-video': '2026-11-26',
   '/examples': '2026-11-25',

@@ -9,6 +9,7 @@
  */
 
 import { PaymentInterval, PaymentType } from '@/core/payment/types';
+import { videoCreditCost } from '@/config/magi-video';
 
 export type PricingPlanInfo = {
   name: string;
@@ -51,7 +52,7 @@ export const videoPlans = {
       tier: 'starter',
       productId: 'video_starter_once',
       label: 'Starter',
-      credits: 9500,
+      credits: videoCreditCost(5, '1080p'),
       priceInCents: 1500,
     },
     {
