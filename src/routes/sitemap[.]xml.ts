@@ -6,16 +6,16 @@ import { getLocalPosts, mergePosts } from '@/content/posts';
 
 // Date of the most recent substantive content edit on each static page.
 const STATIC_LAST_MODIFIED = {
-  '': '2026-11-25',
+  '': '2026-11-26',
   '/pricing': '2026-11-25',
-  '/text-to-video': '2026-11-25',
-  '/image-to-video': '2026-11-25',
+  '/text-to-video': '2026-11-26',
+  '/image-to-video': '2026-11-26',
   '/examples': '2026-11-25',
   '/prompts': '2026-11-25',
-  '/guide': '2026-11-25',
+  '/guide': '2026-11-26',
   '/magi-2-preview': '2026-11-25',
   '/privacy-policy': '2026-11-25',
-  '/terms-of-service': '2026-11-25',
+  '/terms-of-service': '2026-11-26',
 } satisfies Record<string, string>;
 
 const POLICY_PATHS = new Set(['/privacy-policy', '/terms-of-service']);
@@ -57,8 +57,7 @@ function entryXml(e: Entry, origin: string): string {
     `    <changefreq>${e.changeFrequency}</changefreq>`,
     `    <priority>${e.priority}</priority>`,
     '  </url>',
-  ]
-    .join('\n');
+  ].join('\n');
 }
 
 export const Route = createFileRoute('/sitemap.xml')({
