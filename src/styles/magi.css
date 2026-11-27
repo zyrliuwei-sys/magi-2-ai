@@ -116,7 +116,11 @@
   top: calc(100% + 12px);
   right: 0;
   min-width: 170px;
+  max-height: calc(100vh - 84px);
+  max-height: calc(100dvh - 84px);
   display: grid;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   border: 1px solid var(--magi-line);
   border-radius: 13px;
   padding: 5px;
@@ -125,6 +129,7 @@
 }
 .magi-mobile-nav nav a {
   display: block;
+  min-height: 40px;
   border-radius: 8px;
   padding: 10px 12px;
   color: var(--magi-muted);
@@ -1609,6 +1614,21 @@
 }
 
 @media (max-width: 768px) {
+  .magi-modes button,
+  .magi-settings select,
+  .magi-audio-toggle,
+  .magi-filter button,
+  .magi-prompt-actions .magi-button,
+  .magi-site button.magi-text-link,
+  .magi-site .magi-preview-bottom a {
+    min-height: 44px;
+  }
+
+  .magi-prompt-label,
+  .magi-preview-bottom {
+    align-items: center;
+  }
+
   .magi-intro h1 {
     overflow-wrap: anywhere;
   }

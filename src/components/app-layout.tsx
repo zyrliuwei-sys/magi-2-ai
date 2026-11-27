@@ -170,7 +170,7 @@ export function AppLayout({
           )}
         >
           <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
+            <SidebarTrigger className="-ml-1 max-md:size-11" />
           </div>
           <div className="flex-1" />
           {headerExtra && (

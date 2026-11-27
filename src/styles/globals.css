@@ -457,3 +457,39 @@
     color: oklch(0.7 0.16 70);
   }
 }
+
+/* Keep centered dialogs inside short viewports, including phone landscape. */
+@media (max-width: 767px), (max-height: 480px) {
+  [data-slot='dialog-content'] {
+    max-height: 90vh;
+    max-height: min(90dvh, calc(100dvh - 2rem));
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+}
+
+@media (max-width: 767px) {
+  [data-slot='sidebar-inset'] :is(button:not([role='switch']), select, summary),
+  [data-slot='dialog-content'] :is(button:not([role='switch']), select),
+  form button[type='submit'],
+  [data-mobile='true']
+    :is([data-sidebar='menu-button'], [data-sidebar='menu-sub-button']) {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  :is([data-slot='sidebar-inset'], [data-slot='dialog-content'], form)
+    :is([data-slot='input'], [data-slot='textarea'], select) {
+    font-size: 1rem;
+  }
+
+  :is([data-slot='sidebar-inset'], [data-slot='dialog-content'], form)
+    [data-slot='input'] {
+    min-height: 40px;
+  }
+
+  :is([data-slot='sidebar-inset'], [data-slot='dialog-content'])
+    [data-slot='switch']::after {
+    inset-block: -13px;
+  }
+}

@@ -208,7 +208,7 @@ export function DataTable<T>({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between px-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-2">
         <p className="text-muted-foreground text-sm">
           {initialLoading ? '' : m['common.table.total']({ count: total })}
         </p>
