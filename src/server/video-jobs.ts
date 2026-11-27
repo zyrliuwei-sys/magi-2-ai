@@ -9,9 +9,9 @@ import { envConfigs } from '@/config';
 import {
   LEGACY_SEEAPI_VIDEO_MODEL,
   LEGACY_VIDEO_JOB_PROVIDER,
-  MAGI_VIDEO_MAX_DURATION,
+  MAGI_VIDEO_CREDITS,
+  MAGI_VIDEO_DURATION,
   MAGI_VIDEO_MAX_SEED,
-  MAGI_VIDEO_MIN_DURATION,
   MAGI_VIDEO_RESOLUTION,
   VIDEO_IMAGE_LIMIT,
   VIDEO_IMAGE_TYPES,
@@ -21,7 +21,6 @@ import {
   VIDEO_PROMPT_LIMIT,
   VIDEO_RATIOS,
   VIDEO_RESOLUTIONS,
-  videoCreditCost,
   type SeeApiVideoModel,
   type VideoJob,
   type VideoSettings,
@@ -39,10 +38,9 @@ import { getBalance } from '@/modules/credits/service';
 import { getVideoPurchaseStatus } from '@/modules/payment/service';
 import { getStorage } from '@/modules/storage/service';
 
-const durationSchema = z.number().int().max(MAGI_VIDEO_MAX_DURATION);
 const settingsSchema = z.object({
   mode: z.enum(VIDEO_MODES),
-  duration: durationSchema.min(MAGI_VIDEO_MIN_DURATION),
+  duration: z.literal(MAGI_VIDEO_DURATION),
   ratio: z.enum(VIDEO_RATIOS),
   resolution: z.literal(MAGI_VIDEO_RESOLUTION),
   audio: z.boolean(),
@@ -59,8 +57,8 @@ export const videoRequestSchema = settingsSchema
   );
 const httpsUrl = z.url({ protocol: /^https$/ });
 const storedSettings = settingsSchema.extend({
-  // Jobs created before the five-second minimum retain their original request.
-  duration: durationSchema.min(4),
+  // Existing jobs retain their original request when polled or retried.
+  duration: z.number().int().min(4).max(30),
   resolution: z.enum(VIDEO_RESOLUTIONS).default(MAGI_VIDEO_RESOLUTION),
   firstFrame: httpsUrl.optional(),
   lastFrame: httpsUrl.optional(),
@@ -197,7 +195,7 @@ export async function startVideoJob(
   if (isImage && (!image || !videoAvailability(configs).image))
     throw new VideoUnavailableError(settings.mode);
 
-  const costCredits = videoCreditCost(settings.duration);
+  const costCredits = MAGI_VIDEO_CREDITS;
   let firstFrame: string | undefined;
   let lastFrame: string | undefined;
   if (isImage && image) {

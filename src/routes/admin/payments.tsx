@@ -11,7 +11,7 @@ import { Pencil, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { tDynamic } from '@/core/i18n/dynamic';
-import { firstVideoPack } from '@/config/pricing';
+import { isFirstVideoPackProduct } from '@/config/pricing';
 import { apiGet, apiPatch, apiPost, type PageResult } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -99,8 +99,9 @@ function PaymentsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState('all');
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const editingFirstVideoPack =
-    editingOrder?.productId === firstVideoPack.productId;
+  const editingFirstVideoPack = isFirstVideoPackProduct(
+    editingOrder?.productId
+  );
   const [refundingOrder, setRefundingOrder] = useState<Order | null>(null);
   const [refundCredits, setRefundCredits] = useState('');
   const [refundReason, setRefundReason] = useState('');

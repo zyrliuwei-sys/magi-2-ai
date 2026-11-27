@@ -335,13 +335,13 @@ function DashboardPage() {
                 !subscriptionQuery.isPending &&
                 !subscription && (
                   <Link
-                    href="/pricing?billing=monthly"
+                    href="/pricing"
                     className={buttonVariants({
                       variant: 'outline',
                       size: 'xs',
                     })}
                   >
-                    {m['settings.overview.upgrade']()}
+                    {m['video.pricing.buy']()}
                   </Link>
                 )
               }

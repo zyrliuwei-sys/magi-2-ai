@@ -194,7 +194,7 @@ for (const mode of MODES) {
       id: crypto.randomUUID(),
       mode: 'text-to-video',
       prompt: 'A sparrow lands on a garden gate.',
-      duration: 5,
+      duration: 10,
       resolution: '1080p',
       ratio: '9:16',
       audio: false,
@@ -219,7 +219,7 @@ for (const mode of MODES) {
             input: {
               prompt: input.prompt,
               aspect_ratio: input.ratio,
-              duration_seconds: 5,
+              duration_seconds: 10,
               resolution: '1080p',
               generate_audio: false,
             },
@@ -244,9 +244,9 @@ for (const mode of MODES) {
     assert.equal(submissions, 1);
     assert.deepEqual(
       jobs.map((job) => job?.cost),
-      [1500, 1500]
+      [3000, 3000]
     );
-    assert.equal(await getBalance(u), 3500);
+    assert.equal(await getBalance(u), 2000);
     assert.equal(await readVideoJob('u39', input.id), undefined);
 
     await db()

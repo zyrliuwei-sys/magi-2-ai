@@ -219,7 +219,7 @@ test('MAGI-2 sends supported controls and keeps image orientation adaptive', asy
   const id = crypto.randomUUID();
   const textSettings = {
     mode: 'text-to-video',
-    duration: 30,
+    duration: 10,
     ratio: '21:9',
     resolution: '1080p',
     audio: true,
@@ -247,14 +247,14 @@ test('MAGI-2 sends supported controls and keeps image orientation adaptive', asy
         endpoint === 'text-to-video'
           ? {
               prompt,
-              duration_seconds: 30,
+              duration_seconds: 10,
               resolution: '1080p',
               generate_audio: true,
               seed: 0,
               aspect_ratio: '21:9',
             }
           : {
-              duration_seconds: 5,
+              duration_seconds: 10,
               resolution: '1080p',
               generate_audio: false,
               seed: 0,
@@ -271,7 +271,6 @@ test('MAGI-2 sends supported controls and keeps image orientation adaptive', asy
   const imageSettings = {
     ...textSettings,
     mode: 'image-to-video',
-    duration: 5,
     audio: false,
   } as const;
   await client.submit(id, 'magi-2', '', imageSettings, firstFrame, lastFrame);
@@ -280,11 +279,16 @@ test('MAGI-2 sends supported controls and keeps image orientation adaptive', asy
     videoRequestSchema.safeParse({ id, prompt: '', ...imageSettings }).success
   );
   for (const settings of [textSettings, imageSettings]) {
-    assert.equal(
-      videoRequestSchema.safeParse({ id, prompt, ...settings, duration: 4 })
-        .success,
-      false
+    assert.ok(
+      videoRequestSchema.safeParse({ id, prompt, ...settings }).success
     );
+    for (const duration of [4, 5, 9, 11, 15, 30, 31]) {
+      assert.equal(
+        videoRequestSchema.safeParse({ id, prompt, ...settings, duration })
+          .success,
+        false
+      );
+    }
   }
   assert.ok(
     !videoRequestSchema.safeParse({ id, prompt: '', ...textSettings }).success
@@ -296,10 +300,6 @@ test('MAGI-2 sends supported controls and keeps image orientation adaptive', asy
       ...textSettings,
       resolution: '480p',
     }).success
-  );
-  assert.ok(
-    !videoRequestSchema.safeParse({ id, prompt, ...textSettings, duration: 31 })
-      .success
   );
 });
 

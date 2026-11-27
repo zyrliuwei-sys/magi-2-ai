@@ -25,15 +25,14 @@ import {
   type MagiPromptId,
 } from '@/config/magi-content';
 import {
-  MAGI_VIDEO_MAX_DURATION,
+  MAGI_VIDEO_CREDITS,
+  MAGI_VIDEO_DURATION,
   MAGI_VIDEO_MAX_SEED,
-  MAGI_VIDEO_MIN_DURATION,
   MAGI_VIDEO_RESOLUTION,
   VIDEO_IMAGE_LIMIT,
   VIDEO_IMAGE_TYPES,
   VIDEO_PROMPT_LIMIT,
   VIDEO_RATIOS,
-  videoCreditCost,
   videoIsActive,
   type VideoJob,
   type VideoMode,
@@ -49,13 +48,9 @@ import { MagiLink } from './magi-site';
 
 const draftKey = 'magi-video-draft';
 const creditNumber = new Intl.NumberFormat('en-US');
-const studioDurations = Array.from(
-  { length: MAGI_VIDEO_MAX_DURATION - MAGI_VIDEO_MIN_DURATION + 1 },
-  (_, index) => MAGI_VIDEO_MIN_DURATION + index
-);
 const defaultSettings: VideoSettings = {
   mode: 'text-to-video',
-  duration: MAGI_VIDEO_MIN_DURATION,
+  duration: MAGI_VIDEO_DURATION,
   ratio: '16:9',
   resolution: MAGI_VIDEO_RESOLUTION,
   audio: true,
@@ -228,10 +223,7 @@ export function MagiStudio({
       setSettings({
         ...defaultSettings,
         ...draft.settings,
-        duration: Math.max(
-          draft.settings?.duration ?? MAGI_VIDEO_MIN_DURATION,
-          MAGI_VIDEO_MIN_DURATION
-        ),
+        duration: MAGI_VIDEO_DURATION,
         resolution: MAGI_VIDEO_RESOLUTION,
       });
       setNeedsStartingImage(draft.hadStartingImage === true);
@@ -285,7 +277,7 @@ export function MagiStudio({
     setPrompt(saved.prompt);
     setSettings({
       ...saved.settings,
-      duration: Math.max(saved.settings.duration, MAGI_VIDEO_MIN_DURATION),
+      duration: MAGI_VIDEO_DURATION,
       resolution: MAGI_VIDEO_RESOLUTION,
       ratio:
         saved.settings.ratio === 'adaptive'
@@ -500,19 +492,10 @@ export function MagiStudio({
         <div className="magi-settings">
           <label>
             {m['video.studio.duration']()}
-            <select
-              value={settings.duration}
-              onChange={(event) =>
-                changeSettings({
-                  duration: Number(event.target.value),
-                })
-              }
-            >
-              {studioDurations.map((n) => (
-                <option key={n} value={n}>
-                  {m['video.studio.seconds']({ count: n })}
-                </option>
-              ))}
+            <select disabled value={MAGI_VIDEO_DURATION}>
+              <option value={MAGI_VIDEO_DURATION}>
+                {m['video.studio.seconds']({ count: MAGI_VIDEO_DURATION })}
+              </option>
             </select>
           </label>
           <label>
@@ -615,7 +598,7 @@ export function MagiStudio({
           {!working && !generate.isPending && !purchaseRequired && (
             <span>
               {m['video.studio.credit']({
-                count: creditNumber.format(videoCreditCost(settings.duration)),
+                count: creditNumber.format(MAGI_VIDEO_CREDITS),
               })}
             </span>
           )}

@@ -31,7 +31,11 @@ import {
   type PaymentRefund,
 } from '@/core/payment/types';
 import { credit, order, subscription, user } from '@/config/db/schema';
-import { firstVideoPack } from '@/config/pricing';
+import {
+  firstVideoPack,
+  firstVideoPackProductIds,
+  isVideoPackProduct,
+} from '@/config/pricing';
 import { getAllConfigs } from '@/modules/config/service';
 import {
   calculateCreditExpirationTime,
@@ -200,7 +204,7 @@ const unpaidStatuses = [OrderStatus.PENDING, OrderStatus.CREATED];
 function openFirstVideoOrder(userId: string) {
   return and(
     eq(order.userId, userId),
-    eq(order.productId, firstVideoPack.productId),
+    inArray(order.productId, firstVideoPackProductIds),
     inArray(order.status, unpaidStatuses)
   );
 }
@@ -217,7 +221,7 @@ async function reserveFirstVideoOrder(params: {
     .where(
       and(
         eq(order.userId, userId),
-        eq(order.productId, firstVideoPack.productId)
+        inArray(order.productId, firstVideoPackProductIds)
       )
     );
   const digest = await crypto.subtle.digest(
@@ -309,6 +313,7 @@ export async function createFirstVideoCheckout(params: {
     }
 
     const matchesCurrentPack =
+      saved.productId === firstVideoPack.productId &&
       saved.amount === firstVideoPack.priceInCents &&
       saved.currency === firstVideoPack.currency &&
       saved.creditsAmount === firstVideoPack.credits;
@@ -587,12 +592,12 @@ export async function settleCheckoutOrder(
 
   if (session.paymentStatus === PaymentStatus.SUCCESS) {
     if (
-      existingOrder.productId === firstVideoPack.productId &&
+      isVideoPackProduct(existingOrder.productId) &&
       (provider !== 'stripe' ||
         paymentInfo?.paymentAmount !== existingOrder.amount ||
         paymentInfo?.paymentCurrency?.toLowerCase() !== existingOrder.currency)
     ) {
-      throw new Error('First video pack payment does not match the order');
+      throw new Error('Video pack payment does not match the order');
     }
 
     // CNY providers charge exactly the order amount (no coupons or tax on

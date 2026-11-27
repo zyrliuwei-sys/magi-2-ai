@@ -6,7 +6,6 @@ import { MagiPricing } from '@/blocks/magi-pricing';
 import { magiHead, MagiIntro, MagiSite } from '@/blocks/magi-site';
 
 function PricingPage() {
-  const { billing } = Route.useSearch();
   return (
     <MagiSite>
       <div className="magi-wrap">
@@ -14,7 +13,7 @@ function PricingPage() {
           title={m['video.page.pricing.title']()}
           description={m['video.page.pricing.description']()}
         />
-        <MagiPricing key={billing} initialBilling={billing} />
+        <MagiPricing />
         <MagiInsight page="pricing" />
       </div>
     </MagiSite>
@@ -22,9 +21,6 @@ function PricingPage() {
 }
 
 export const Route = createFileRoute('/pricing')({
-  validateSearch: (search: Record<string, unknown>) => ({
-    billing: search.billing === 'monthly' ? ('monthly' as const) : undefined,
-  }),
   head: () =>
     magiHead(
       '/pricing',

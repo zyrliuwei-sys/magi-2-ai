@@ -1,6 +1,5 @@
-export const VIDEO_DURATIONS = [5, 10, 15] as const;
-export const MAGI_VIDEO_MIN_DURATION = 5;
-export const MAGI_VIDEO_MAX_DURATION = 30;
+export const MAGI_VIDEO_DURATION = 10;
+export const MAGI_VIDEO_CREDITS = 3_000;
 export const MAGI_VIDEO_RESOLUTION = '1080p';
 export const MAGI_VIDEO_MAX_SEED = 2_147_483_647;
 export const VIDEO_RATIOS = [
@@ -13,7 +12,6 @@ export const VIDEO_RATIOS = [
 ] as const;
 export const VIDEO_MODES = ['text-to-video', 'image-to-video'] as const;
 export const VIDEO_RESOLUTIONS = ['480p', '720p', '1080p'] as const;
-const VIDEO_CREDITS_PER_SECOND = 300;
 export const VIDEO_PROMPT_LIMIT = 15_000;
 export const VIDEO_IMAGE_LIMIT = 10 * 1024 * 1024;
 export const VIDEO_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -46,10 +44,6 @@ export type VideoJob = {
   createdAt: string;
   url?: string;
 };
-
-export function videoCreditCost(duration: number) {
-  return duration * VIDEO_CREDITS_PER_SECOND;
-}
 
 export function videoIsActive(job: VideoJob) {
   return job.status === 'pending' || job.status === 'processing';

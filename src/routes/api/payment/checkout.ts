@@ -2,7 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import { resolveCharge } from '@/server/payment/charge';
 
 import { getAuth } from '@/core/auth';
-import { firstVideoPack, getPricingProduct } from '@/config/pricing';
+import {
+  firstVideoPack,
+  getPricingProduct,
+  isVideoPackProduct,
+} from '@/config/pricing';
 import { getAllConfigs } from '@/modules/config/service';
 import {
   createCheckout,
@@ -91,8 +95,7 @@ async function POST({ request }: { request: Request }) {
       });
       return respData({ checkout_url: checkoutUrl });
     }
-    const isVideoPack =
-      product.currency === 'cny' && product.productId.startsWith('video_');
+    const isVideoPack = isVideoPackProduct(product.productId);
     if (isVideoPack && payment_provider && payment_provider !== 'stripe')
       return respErr(m['video.pricing.offline'](), { status: 400 });
     const provider = isVideoPack ? 'stripe' : payment_provider;

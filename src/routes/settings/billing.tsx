@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { Eye, MoreHorizontal, Pencil, XCircle } from 'lucide-react';
+import { Coins, Eye, MoreHorizontal, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { tDynamic } from '@/core/i18n/dynamic';
@@ -271,16 +271,14 @@ function BillingPage() {
           <div className="flex items-center justify-between">
             <CardTitle>{m['settings.billing.subscription']()}</CardTitle>
             <Link
-              href="/pricing?billing=monthly"
+              href="/pricing"
               className={cn(
                 buttonVariants({ variant: 'outline', size: 'sm' }),
                 'gap-2'
               )}
             >
-              <Pencil className="size-4" />
-              {current
-                ? m['settings.billing.adjust']()
-                : m['settings.billing.subscribe']()}
+              <Coins className="size-4" />
+              {m['video.pricing.buy']()}
             </Link>
           </div>
         </CardHeader>

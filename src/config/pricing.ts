@@ -9,7 +9,7 @@
  */
 
 import { PaymentInterval, PaymentType } from '@/core/payment/types';
-import { videoCreditCost } from '@/config/magi-video';
+import { MAGI_VIDEO_CREDITS } from '@/config/magi-video';
 
 export type PricingPlanInfo = {
   name: string;
@@ -46,111 +46,144 @@ export type PricingProduct = {
   maxLinks?: number;
 };
 
+const legacyFirstVideoPackProductId = 'video_first_purchase';
+
 export const firstVideoPack = {
-  productId: 'video_first_purchase',
+  productId: 'video_first_purchase_usd',
+  tier: 'first',
   label: 'First Video Pack',
   priceInCents: 990,
-  currency: 'cny',
-  credits: videoCreditCost(5),
+  currency: 'usd',
+  clips: 1,
+  credits: MAGI_VIDEO_CREDITS,
 } as const;
 
-export const videoPlans = {
-  oneTime: [
-    {
-      tier: 'starter',
-      productId: 'video_starter_once_cny',
-      label: 'Starter',
-      credits: 6000,
-      priceInCents: 2990,
-    },
-    {
-      tier: 'creator',
-      productId: 'video_creator_once_cny',
-      label: 'Creator',
-      credits: 15000,
-      priceInCents: 6990,
-    },
-    {
-      tier: 'studio',
-      productId: 'video_studio_once_cny',
-      label: 'Studio',
-      credits: 36000,
-      priceInCents: 14990,
-    },
-  ],
-  monthly: [
-    {
-      tier: 'starter',
-      productId: 'video_starter_monthly_cny',
-      label: 'Starter',
-      credits: 10500,
-      priceInCents: 4990,
-    },
-    {
-      tier: 'creator',
-      productId: 'video_creator_monthly_cny',
-      label: 'Creator',
-      credits: 25500,
-      priceInCents: 10990,
-    },
-    {
-      tier: 'studio',
-      productId: 'video_studio_monthly_cny',
-      label: 'Studio',
-      credits: 60000,
-      priceInCents: 22990,
-    },
-  ],
-} as const;
+const regularVideoPacks = [
+  {
+    tier: 'three',
+    productId: 'video_three_once_usd',
+    label: '3-Video Pack',
+    clips: 3,
+    priceInCents: 3990,
+  },
+  {
+    tier: 'five',
+    productId: 'video_five_once_usd',
+    label: '5-Video Pack',
+    clips: 5,
+    priceInCents: 5990,
+  },
+] as const;
 
-const videoProducts = [
-  ...videoPlans.oneTime.map(({ label, productId, credits, priceInCents }) => ({
-    productId,
-    productName: `${label} Video Credit Pack`,
-    planName: label,
-    description: `${credits} video credits`,
-    type: PaymentType.ONE_TIME,
-    priceInCents,
-    currency: 'cny',
-    credits,
+export const videoPacks = [
+  firstVideoPack,
+  ...regularVideoPacks.map((pack) => ({
+    ...pack,
+    currency: 'usd' as const,
+    credits: pack.clips * MAGI_VIDEO_CREDITS,
   })),
-  ...videoPlans.monthly.map(({ label, productId, credits, priceInCents }) => ({
-    productId,
-    productName: `${label} Video Subscription`,
-    planName: label,
-    description: `${credits} video credits per month`,
-    type: PaymentType.SUBSCRIPTION,
-    priceInCents,
-    currency: 'cny',
-    credits,
-    creditsValidDays: 31,
-    plan: { name: label, interval: PaymentInterval.MONTH, intervalCount: 1 },
-  })),
-] satisfies PricingProduct[];
+] as const;
+
+export const firstVideoPackProductIds = [
+  firstVideoPack.productId,
+  legacyFirstVideoPackProductId,
+] as const;
+
+export function isFirstVideoPackProduct(productId: string | null | undefined) {
+  return firstVideoPackProductIds.some((id) => id === productId);
+}
+
+export function isVideoPackProduct(productId: string | null) {
+  return (
+    productId === legacyFirstVideoPackProductId ||
+    videoPacks.some((pack) => pack.productId === productId)
+  );
+}
 
 const archivedVideoPlans = [
+  [
+    legacyFirstVideoPackProductId,
+    firstVideoPack.label,
+    990,
+    1500,
+    PaymentType.ONE_TIME,
+    'cny',
+  ],
   ['video_starter_once', 'Starter', 1500, 10550, PaymentType.ONE_TIME],
   ['video_creator_once', 'Creator', 3900, 28500, PaymentType.ONE_TIME],
   ['video_studio_once', 'Studio', 8900, 76000, PaymentType.ONE_TIME],
   ['video_starter_monthly', 'Starter', 1900, 15200, PaymentType.SUBSCRIPTION],
   ['video_creator_monthly', 'Creator', 4900, 45600, PaymentType.SUBSCRIPTION],
   ['video_studio_monthly', 'Studio', 11900, 121600, PaymentType.SUBSCRIPTION],
+  [
+    'video_starter_once_cny',
+    'Starter',
+    2990,
+    6000,
+    PaymentType.ONE_TIME,
+    'cny',
+  ],
+  [
+    'video_creator_once_cny',
+    'Creator',
+    6990,
+    15000,
+    PaymentType.ONE_TIME,
+    'cny',
+  ],
+  [
+    'video_studio_once_cny',
+    'Studio',
+    14990,
+    36000,
+    PaymentType.ONE_TIME,
+    'cny',
+  ],
+  [
+    'video_starter_monthly_cny',
+    'Starter',
+    4990,
+    10500,
+    PaymentType.SUBSCRIPTION,
+    'cny',
+  ],
+  [
+    'video_creator_monthly_cny',
+    'Creator',
+    10990,
+    25500,
+    PaymentType.SUBSCRIPTION,
+    'cny',
+  ],
+  [
+    'video_studio_monthly_cny',
+    'Studio',
+    22990,
+    60000,
+    PaymentType.SUBSCRIPTION,
+    'cny',
+  ],
 ] as const;
 
 export const pricingCatalog: Record<string, PricingProduct> = {
-  [firstVideoPack.productId]: {
-    ...firstVideoPack,
-    productName: firstVideoPack.label,
-    planName: firstVideoPack.label,
-    description: firstVideoPack.label,
-    type: PaymentType.ONE_TIME,
-  },
   ...Object.fromEntries(
-    videoProducts.map((product) => [product.productId, product])
+    videoPacks.map(({ productId, label, priceInCents, credits, currency }) => [
+      productId,
+      {
+        productId,
+        productName: label,
+        planName: label,
+        description: `${credits.toLocaleString('en-US')} video credits`,
+        type: PaymentType.ONE_TIME,
+        priceInCents,
+        currency,
+        credits,
+      } satisfies PricingProduct,
+    ])
   ),
   ...Object.fromEntries(
     archivedVideoPlans.map(
-      ([productId, label, priceInCents, credits, type]) => [
+      ([productId, label, priceInCents, credits, type, currency = 'usd']) => [
         productId,
         {
           productId,
@@ -160,7 +193,7 @@ export const pricingCatalog: Record<string, PricingProduct> = {
           priceInCents,
           credits,
           type,
-          currency: 'usd',
+          currency,
           checkoutEnabled: false,
         } satisfies PricingProduct,
       ]

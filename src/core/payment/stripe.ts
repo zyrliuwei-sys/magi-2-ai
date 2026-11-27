@@ -140,7 +140,11 @@ export class StripeProvider implements PaymentProvider {
         sessionParams.expires_at = reservation.expiresAt;
         sessionParams.payment_method_types = ['card'];
         sessionParams.customer_email = order.customer?.email;
-      } else if (this.configs.allowPromotionCodes && !sessionParams.discounts) {
+      } else if (
+        !order.cardOnly &&
+        this.configs.allowPromotionCodes &&
+        !sessionParams.discounts
+      ) {
         sessionParams.allow_promotion_codes = true;
       }
 

@@ -2,7 +2,7 @@ import { and, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
 
 import { affectedRows, db } from '@/core/db';
 import { order, user } from '@/config/db/schema';
-import { firstVideoPack } from '@/config/pricing';
+import { isFirstVideoPackProduct } from '@/config/pricing';
 import { respErr, respOk, respPage } from '@/lib/resp';
 import { keywordMatch } from '@/lib/sql-search';
 import { m } from '@/paraglide/messages.js';
@@ -117,10 +117,10 @@ export async function PATCH({ request, actor }: AdminHandlerContext) {
       status !== undefined && status !== '' && status !== current.status;
     const productChange =
       productId !== undefined && productId !== current.productId;
-    const isFirstVideoPack = current.productId === firstVideoPack.productId;
+    const isFirstVideoPack = isFirstVideoPackProduct(current.productId);
     if (
       (isFirstVideoPack && (statusChange || productChange)) ||
-      (productChange && productId === firstVideoPack.productId)
+      (productChange && isFirstVideoPackProduct(productId))
     ) {
       return respErr(m['admin.payments.first_video_pack_managed']());
     }

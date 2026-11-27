@@ -46,7 +46,7 @@ const { enforceMinIntervalRateLimit } = await import('../src/lib/rate-limit');
 const { PATCH: patchOrder } =
   await import('../src/server/admin/handlers/orders');
 const { isValidEmbedSetting } = await import('../src/lib/embed-ids');
-const { firstVideoPack, getPricingProduct, videoPlans } =
+const { firstVideoPack, getPricingProduct, listPricingProducts } =
   await import('../src/config/pricing');
 
 before(async () => {
@@ -84,27 +84,25 @@ const success = (orderNo: string, amount: number) => ({
   paymentResult: { out_trade_no: orderNo },
 });
 
-test('each video price resolves to its server-side credits and billing frequency', () => {
-  for (const [billing, plans] of Object.entries(videoPlans)) {
-    assert.equal(plans.length, 3);
-    assert.equal(new Set(plans.map((plan) => plan.priceInCents)).size, 3);
-    for (const plan of plans) {
-      const product = getPricingProduct(plan.productId);
-      assert.ok(product && product.checkoutEnabled !== false);
-      assert.equal(product.priceInCents, plan.priceInCents);
-      assert.equal(product.credits, plan.credits);
-      assert.equal(product.currency, 'cny');
-      if (billing === 'monthly') {
-        assert.equal(product.type, 'subscription');
-        assert.equal(product.plan?.interval, 'month');
-        assert.equal(product.plan?.intervalCount, 1);
-        assert.ok(product.creditsValidDays);
-      } else {
-        assert.equal(product.type, 'one-time');
-        assert.equal(product.plan, undefined);
-        assert.equal(product.creditsValidDays, undefined);
-      }
-    }
+test('only three one-time USD video packs are purchasable', () => {
+  const products = listPricingProducts().filter(
+    (product) =>
+      product.productId.startsWith('video_') &&
+      product.checkoutEnabled !== false
+  );
+  assert.deepEqual(
+    products.map(({ priceInCents, credits }) => [priceInCents, credits]),
+    [
+      [990, 3000],
+      [3990, 9000],
+      [5990, 15000],
+    ]
+  );
+  for (const product of products) {
+    assert.equal(product.currency, 'usd');
+    assert.equal(product.type, 'one-time');
+    assert.equal(product.plan, undefined);
+    assert.equal(product.creditsValidDays, undefined);
   }
   assert.equal(
     getPricingProduct('enterprise_lifetime')?.checkoutEnabled,
@@ -115,7 +113,10 @@ test('each video price resolves to its server-side credits and billing frequency
     getPricingProduct('video_starter_monthly')?.checkoutEnabled,
     false
   );
-  assert.equal(getPricingProduct('video_first_purchase')?.priceInCents, 990);
+  assert.equal(
+    getPricingProduct('video_first_purchase')?.checkoutEnabled,
+    false
+  );
 });
 
 test('video generation requires a confirmed, nonzero credit purchase', async () => {
@@ -147,7 +148,7 @@ test('video generation requires a confirmed, nonzero credit purchase', async () 
     id: crypto.randomUUID(),
     prompt: 'A camera moves past a sculpture',
     mode: 'text-to-video',
-    duration: 5,
+    duration: 10,
     resolution: '1080p',
     ratio: '16:9',
     audio: true,
@@ -209,7 +210,7 @@ test('first pack checkout resumes one session, retries expiry and grants credits
         InstanceType<typeof StripeProvider>['createPayment']
       >[0]
     ) => {
-      assert.deepEqual(params.order.price, { currency: 'cny', amount: 990 });
+      assert.deepEqual(params.order.price, { currency: 'usd', amount: 990 });
       assert.ok(params.order.successUrl && params.reservation);
       const callback = new URL(params.order.successUrl);
       assert.equal(callback.origin, appUrl);
@@ -237,10 +238,10 @@ test('first pack checkout resumes one session, retries expiry and grants credits
     orderNo: 'old-first-pack',
     userId,
     status: 'created',
-    amount: 999,
-    currency: 'usd',
-    productId: firstVideoPack.productId,
-    creditsAmount: 12450,
+    amount: 990,
+    currency: 'cny',
+    productId: 'video_first_purchase',
+    creditsAmount: 1500,
     paymentProvider: 'stripe',
     paymentSessionId: 'old-session',
     checkoutInfo: '{}',
@@ -274,7 +275,8 @@ test('first pack checkout resumes one session, retries expiry and grants credits
     .from(schema.order)
     .where(eq(schema.order.checkoutUrl, replacement));
   assert.equal(reserved.productId, firstVideoPack.productId);
-  assert.equal(reserved.creditsAmount, 1500);
+  assert.equal(reserved.creditsAmount, 3000);
+  assert.equal(reserved.currency, 'usd');
   assert.equal(reserved.status, 'created');
   const manualClose = await patchOrder({
     request: new Request('http://localhost/api/admin/orders', {
@@ -284,7 +286,7 @@ test('first pack checkout resumes one session, retries expiry and grants credits
     actor: {},
   } as any);
   assert.notEqual((await manualClose.json()).code, 0);
-  const paid = (amount: number, currency = 'cny') => ({
+  const paid = (amount: number, currency = 'usd') => ({
     paymentStatus: PaymentStatus.SUCCESS,
     paymentInfo: { paymentAmount: amount, paymentCurrency: currency },
     paymentResult: { id: reserved.paymentSessionId },
@@ -294,7 +296,7 @@ test('first pack checkout resumes one session, retries expiry and grants credits
     /does not match/
   );
   await assert.rejects(
-    settleCheckoutOrder(reserved, paid(990, 'usd'), 'stripe'),
+    settleCheckoutOrder(reserved, paid(990, 'cny'), 'stripe'),
     /does not match/
   );
   await settleCheckoutOrder(reserved, paid(990), 'stripe');
@@ -307,7 +309,7 @@ test('first pack checkout resumes one session, retries expiry and grants credits
     .select({ credits: schema.credit.credits })
     .from(schema.credit)
     .where(eq(schema.credit.userId, userId));
-  assert.deepEqual(grants, [{ credits: 1500 }]);
+  assert.deepEqual(grants, [{ credits: 3000 }]);
   await assert.rejects(
     createFirstVideoCheckout(request),
     FirstVideoPackUnavailableError
