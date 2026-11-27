@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { VIDEO_MODEL, type VideoSettings } from '@/config/magi-video';
+import {
+  LEGACY_SEEAPI_VIDEO_MODEL,
+  type SeeApiVideoModel,
+  type VideoSettings,
+} from '@/config/magi-video';
 import { normalizeSeeApiConfigs } from '@/config/seeapi';
 
 const generationResponse = z.object({
@@ -38,7 +42,10 @@ export class SeeApiVideoError extends Error {
   }
 
   get rejected() {
-    return [400, 401, 402, 403, 404, 413, 422].includes(this.status);
+    return (
+      (this.status >= 300 && this.status < 400) ||
+      [400, 401, 402, 403, 404, 413, 422].includes(this.status)
+    );
   }
 }
 
@@ -64,7 +71,8 @@ export function createSeeApiVideoClient(configs: Record<string, string>) {
     const response = await fetch(`${baseUrl}/v1/generations${path}`, {
       ...init,
       headers,
-      redirect: 'error',
+      // Return a redirect to the status check without forwarding the API key.
+      redirect: 'manual',
       signal: AbortSignal.timeout(20_000),
     });
     if (!response.ok) {
@@ -82,28 +90,46 @@ export function createSeeApiVideoClient(configs: Record<string, string>) {
   return {
     submit(
       id: string,
+      model: SeeApiVideoModel,
       prompt: string,
       settings: VideoSettings,
-      firstFrame?: string
+      firstFrame?: string,
+      lastFrame?: string
     ) {
+      const image = settings.mode === 'image-to-video';
+      const input = {
+        prompt: prompt || undefined,
+        duration_seconds: settings.duration,
+        resolution: settings.resolution,
+        generate_audio: settings.audio,
+        seed: settings.seed,
+      };
       return request('', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': id },
         body: JSON.stringify({
-          model: VIDEO_MODEL,
+          model,
           endpoint: settings.mode,
           provider: 'seeapi',
-          input: {
-            prompt,
-            aspect_ratio:
-              settings.mode === 'image-to-video' ? 'adaptive' : settings.ratio,
-            duration_seconds: settings.duration,
-            resolution: settings.resolution,
-            generate_audio: settings.audio,
-            first_frame_image: firstFrame,
-            output_format: 'mp4',
-            nsfw_checker: true,
-          },
+          input:
+            model === LEGACY_SEEAPI_VIDEO_MODEL
+              ? {
+                  prompt,
+                  aspect_ratio: image ? 'adaptive' : settings.ratio,
+                  duration_seconds: settings.duration,
+                  resolution: settings.resolution,
+                  generate_audio: settings.audio,
+                  first_frame_image: firstFrame,
+                  output_format: 'mp4',
+                  nsfw_checker: true,
+                }
+              : image
+                ? {
+                    ...input,
+                    first_frame_image: firstFrame,
+                    last_frame_image: lastFrame,
+                  }
+                : { ...input, aspect_ratio: settings.ratio },
         }),
       });
     },

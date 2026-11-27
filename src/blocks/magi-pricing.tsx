@@ -4,12 +4,7 @@ import { ArrowUpRight, Check, Coins } from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
-import {
-  DEFAULT_VIDEO_RESOLUTION,
-  VIDEO_DURATIONS,
-  VIDEO_RESOLUTIONS,
-  videoCreditCost,
-} from '@/config/magi-video';
+import { VIDEO_DURATIONS, videoCreditCost } from '@/config/magi-video';
 import { firstVideoPack, videoPlans } from '@/config/pricing';
 import { apiPost } from '@/lib/api-client';
 import { m } from '@/paraglide/messages.js';
@@ -18,18 +13,13 @@ import { useVideoPurchase } from '@/hooks/use-video-purchase';
 
 import { MagiLink } from './magi-site';
 
-const providers = ['stripe', 'creem', 'paypal'] as const;
 const creditNumber = new Intl.NumberFormat('en-US');
 const billingOptions = ['oneTime', 'monthly'] as const;
 type BillingOption = (typeof billingOptions)[number];
-const usd = new Intl.NumberFormat('en-US', {
+const yuan = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 0,
-});
-const usdWithCents = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
+  currency: 'CNY',
+  currencyDisplay: 'narrowSymbol',
 });
 
 export function CreditEstimate({ compact = false }: { compact?: boolean }) {
@@ -52,9 +42,7 @@ export function CreditEstimate({ compact = false }: { compact?: boolean }) {
               <dt>{m['video.studio.seconds']({ count: duration })}</dt>
               <dd>
                 {m['video.studio.credit']({
-                  count: creditNumber.format(
-                    videoCreditCost(duration, DEFAULT_VIDEO_RESOLUTION)
-                  ),
+                  count: creditNumber.format(videoCreditCost(duration)),
                 })}
               </dd>
             </div>
@@ -65,25 +53,17 @@ export function CreditEstimate({ compact = false }: { compact?: boolean }) {
           <table aria-label={m['video.pricing.estimate']()}>
             <thead>
               <tr>
-                <th scope="col">{m['video.studio.resolution']()}</th>
-                {VIDEO_DURATIONS.map((duration) => (
-                  <th key={duration} scope="col">
-                    {m['video.studio.seconds']({ count: duration })}
-                  </th>
-                ))}
+                <th scope="col">{m['video.studio.duration']()}</th>
+                <th scope="col">{m['video.pricing.credits_at_1080p']()}</th>
               </tr>
             </thead>
             <tbody>
-              {VIDEO_RESOLUTIONS.map((resolution) => (
-                <tr key={resolution}>
-                  <th scope="row">{resolution}</th>
-                  {VIDEO_DURATIONS.map((duration) => (
-                    <td key={duration}>
-                      {creditNumber.format(
-                        videoCreditCost(duration, resolution)
-                      )}
-                    </td>
-                  ))}
+              {[4, ...VIDEO_DURATIONS, 30].map((duration) => (
+                <tr key={duration}>
+                  <th scope="row">
+                    {m['video.studio.seconds']({ count: duration })}
+                  </th>
+                  <td>{creditNumber.format(videoCreditCost(duration))}</td>
                 </tr>
               ))}
             </tbody>
@@ -111,17 +91,12 @@ export function MagiPricing({
   const { data: session } = useSession();
   const purchase = useVideoPurchase(session?.user?.id);
   const router = useRouter();
-  const enabled = providers.filter(
-    (provider) => config?.[`${provider}_enabled`] === 'true'
-  );
-  const provider =
-    enabled.find((name) => name === config?.default_payment_provider) ??
-    enabled[0];
+  const stripeEnabled = config?.stripe_enabled === 'true';
   const checkout = useMutation({
     mutationFn: (id: string) =>
       apiPost<{ checkout_url?: string }>('/api/payment/checkout', {
         product_id: id,
-        payment_provider: id === firstVideoPack.productId ? 'stripe' : provider,
+        payment_provider: 'stripe',
         redirect: '/settings/videos',
         locale: 'en',
       }),
@@ -132,7 +107,7 @@ export function MagiPricing({
   });
 
   function buy(id: string) {
-    if (!provider) return;
+    if (!stripeEnabled) return;
     if (!session?.user) {
       const returnTo = monthly ? '/pricing?billing=monthly' : '/pricing';
       router.push(`/sign-in?callbackUrl=${encodeURIComponent(returnTo)}`);
@@ -186,9 +161,7 @@ export function MagiPricing({
         <article className="magi-price-card mb-3">
           <PlanTitle>{m['video.pricing.first_pack']()}</PlanTitle>
           <div className="magi-plan-price">
-            <strong>
-              {usdWithCents.format(firstVideoPack.priceInCents / 100)}
-            </strong>
+            <strong>{yuan.format(firstVideoPack.priceInCents / 100)}</strong>
             <span>{m['video.pricing.once']()}</span>
           </div>
           <div className="magi-plan-allowance">
@@ -204,7 +177,7 @@ export function MagiPricing({
           <button
             className="magi-button magi-button-primary"
             type="button"
-            disabled={config?.stripe_enabled !== 'true' || checkout.isPending}
+            disabled={!stripeEnabled || checkout.isPending}
             onClick={() => buy(firstVideoPack.productId)}
           >
             {m['video.pricing.first_pack_buy']()} <ArrowUpRight size={15} />
@@ -216,7 +189,7 @@ export function MagiPricing({
           <article className="magi-price-card" key={plan.productId}>
             <PlanTitle>{m[`video.pricing.pack.${plan.tier}`]()}</PlanTitle>
             <div className="magi-plan-price">
-              <strong>{usd.format(plan.priceInCents / 100)}</strong>
+              <strong>{yuan.format(plan.priceInCents / 100)}</strong>
               <span>
                 {monthly
                   ? m['video.pricing.month']()
@@ -233,19 +206,14 @@ export function MagiPricing({
                 ]({ count: creditNumber.format(plan.credits) })}
               </p>
               <p>
-                {!monthly && plan.tier === 'starter'
-                  ? m['video.pricing.starter_hd']()
-                  : m['video.pricing.clip_count']({
-                      count: Math.floor(
-                        plan.credits /
-                          videoCreditCost(5, DEFAULT_VIDEO_RESOLUTION)
-                      ),
-                    })}
+                {m['video.pricing.clip_count']({
+                  count: Math.floor(plan.credits / videoCreditCost(5)),
+                })}
               </p>
             </div>
             <button
               className="magi-button magi-button-primary"
-              disabled={!provider || checkout.isPending}
+              disabled={!stripeEnabled || checkout.isPending}
               type="button"
               onClick={() => buy(plan.productId)}
             >
@@ -257,7 +225,7 @@ export function MagiPricing({
           </article>
         ))}
       </div>
-      {(config || configError) && !provider && (
+      {(config || configError) && !stripeEnabled && (
         <p className="magi-note magi-library-note">
           {m['video.pricing.offline']()}
         </p>

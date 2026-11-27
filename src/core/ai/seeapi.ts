@@ -24,7 +24,8 @@ export async function testSeeApiConnection(
     const response = await fetch(`${values.seeapi_base_url}/v1/credits`, {
       method: 'GET',
       headers: { Accept: 'application/json', Authorization: `Bearer ${key}` },
-      redirect: 'error',
+      // Workers supports manual redirects; the status check rejects every 3xx.
+      redirect: 'manual',
       signal: AbortSignal.timeout(10_000),
     });
     // Provider error bodies can contain credentials or diagnostics. Never echo them.

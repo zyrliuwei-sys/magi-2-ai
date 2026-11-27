@@ -7,8 +7,12 @@ import {
 } from '@/core/ai/seeapi-video';
 import { envConfigs } from '@/config';
 import {
+  LEGACY_SEEAPI_VIDEO_MODEL,
   LEGACY_VIDEO_JOB_PROVIDER,
-  VIDEO_DURATIONS,
+  MAGI_VIDEO_MAX_DURATION,
+  MAGI_VIDEO_MAX_SEED,
+  MAGI_VIDEO_MIN_DURATION,
+  MAGI_VIDEO_RESOLUTION,
   VIDEO_IMAGE_LIMIT,
   VIDEO_IMAGE_TYPES,
   VIDEO_JOB_PROVIDER,
@@ -18,6 +22,7 @@ import {
   VIDEO_RATIOS,
   VIDEO_RESOLUTIONS,
   videoCreditCost,
+  type SeeApiVideoModel,
   type VideoJob,
   type VideoSettings,
 } from '@/config/magi-video';
@@ -34,21 +39,32 @@ import { getBalance } from '@/modules/credits/service';
 import { getVideoPurchaseStatus } from '@/modules/payment/service';
 import { getStorage } from '@/modules/storage/service';
 
-export const videoRequestSchema = z.object({
-  id: z.uuid(),
-  prompt: z.string().trim().min(1).max(VIDEO_PROMPT_LIMIT),
+const settingsSchema = z.object({
   mode: z.enum(VIDEO_MODES),
-  duration: z.literal(VIDEO_DURATIONS),
+  duration: z
+    .number()
+    .int()
+    .min(MAGI_VIDEO_MIN_DURATION)
+    .max(MAGI_VIDEO_MAX_DURATION),
   ratio: z.enum(VIDEO_RATIOS),
-  resolution: z.enum(VIDEO_RESOLUTIONS),
+  resolution: z.literal(MAGI_VIDEO_RESOLUTION),
   audio: z.boolean(),
+  seed: z.number().int().min(0).max(MAGI_VIDEO_MAX_SEED).optional(),
 });
 
-const settingsSchema = videoRequestSchema.omit({ id: true, prompt: true });
+export const videoRequestSchema = settingsSchema
+  .extend({ id: z.uuid(), prompt: z.string().trim().max(VIDEO_PROMPT_LIMIT) })
+  .refine(
+    ({ mode, prompt }) => mode === 'image-to-video' || prompt.length > 0,
+    {
+      path: ['prompt'],
+    }
+  );
 const httpsUrl = z.url({ protocol: /^https$/ });
 const storedSettings = settingsSchema.extend({
-  resolution: settingsSchema.shape.resolution.default('1080p'),
+  resolution: z.enum(VIDEO_RESOLUTIONS).default(MAGI_VIDEO_RESOLUTION),
   firstFrame: httpsUrl.optional(),
+  lastFrame: httpsUrl.optional(),
 });
 const outputSchema = z.object({ url: httpsUrl });
 const submissionRetryMs = 30_000;
@@ -57,6 +73,10 @@ const videoProviders = [VIDEO_JOB_PROVIDER, LEGACY_VIDEO_JOB_PROVIDER];
 type VideoTask = NonNullable<Awaited<ReturnType<typeof findTask>>>;
 type SeeApiClient = NonNullable<ReturnType<typeof createSeeApiVideoClient>>;
 type SeeApiGeneration = Awaited<ReturnType<SeeApiClient['get']>>;
+
+function isSeeApiVideoModel(model: string): model is SeeApiVideoModel {
+  return model === VIDEO_MODEL || model === LEGACY_SEEAPI_VIDEO_MODEL;
+}
 
 export function videoAvailability(configs: ConfigMap) {
   const text = !!createSeeApiVideoClient(configs);
@@ -87,7 +107,7 @@ function ownsTask(
     !!task &&
     task.userId === userId &&
     videoProviders.some((provider) => provider === task.provider) &&
-    (task.provider !== VIDEO_JOB_PROVIDER || task.model === VIDEO_MODEL) &&
+    (task.provider !== VIDEO_JOB_PROVIDER || isSeeApiVideoModel(task.model)) &&
     task.mediaType === 'video' &&
     !task.deletedAt
   );
@@ -122,6 +142,7 @@ function toVideoJob(task: VideoTask): VideoJob {
       duration,
       resolution,
       audio,
+      seed: parsed.success ? parsed.data.seed : undefined,
       ratio:
         mode === 'image-to-video' && task.provider === VIDEO_JOB_PROVIDER
           ? 'adaptive'
@@ -160,7 +181,8 @@ export async function validateReference(value: FormDataEntryValue | null) {
 export async function startVideoJob(
   userId: string,
   input: z.infer<typeof videoRequestSchema>,
-  image?: File
+  image?: File,
+  endingImage?: File
 ) {
   const { id, prompt, ...settings } = input;
   const found = await findTask(id);
@@ -176,22 +198,27 @@ export async function startVideoJob(
   if (isImage && (!image || !videoAvailability(configs).image))
     throw new VideoUnavailableError(settings.mode);
 
-  const costCredits = videoCreditCost(settings.duration, settings.resolution);
+  const costCredits = videoCreditCost(settings.duration);
   let firstFrame: string | undefined;
+  let lastFrame: string | undefined;
   if (isImage && image) {
     // Avoid storing uploads from accounts unable to pay. createTask checks again atomically.
     if ((await getBalance(userId)) < costCredits)
       throw new Error('Insufficient credits');
     const storage = await getStorage();
-    const result = await storage?.uploadFile({
-      key: `video-inputs/${crypto.randomUUID()}.${image.type.split('/')[1]}`,
-      body: new Uint8Array(await image.arrayBuffer()),
-      contentType: image.type,
-      disposition: 'inline',
-    });
-    if (!result?.success || !httpsUrl.safeParse(result.url).success)
-      throw new VideoUnavailableError(settings.mode);
-    firstFrame = result.url;
+    const uploadFrame = async (frame: File) => {
+      const result = await storage?.uploadFile({
+        key: `video-inputs/${crypto.randomUUID()}.${frame.type.split('/')[1]}`,
+        body: new Uint8Array(await frame.arrayBuffer()),
+        contentType: frame.type,
+        disposition: 'inline',
+      });
+      if (!result?.success || !httpsUrl.safeParse(result.url).success)
+        throw new VideoUnavailableError(settings.mode);
+      return result.url;
+    };
+    firstFrame = await uploadFrame(image);
+    if (endingImage) lastFrame = await uploadFrame(endingImage);
   }
 
   let task: VideoTask;
@@ -204,7 +231,7 @@ export async function startVideoJob(
       provider: VIDEO_JOB_PROVIDER,
       model: VIDEO_MODEL,
       costCredits,
-      options: { ...settings, firstFrame },
+      options: { ...settings, firstFrame, lastFrame },
     });
   } catch (error) {
     // A concurrent retry can win the insert without charging a second time.
@@ -218,16 +245,25 @@ export async function startVideoJob(
 }
 
 async function submitTask(task: VideoTask, client: SeeApiClient) {
+  if (!isSeeApiVideoModel(task.model)) return task;
   const settings = storedSettings.safeParse(readJson(task.options));
   if (!settings.success) return await failUnsubmittedTask(task);
+  if (
+    task.model === VIDEO_MODEL &&
+    (settings.data.resolution !== MAGI_VIDEO_RESOLUTION ||
+      (settings.data.mode === 'image-to-video' && !settings.data.firstFrame))
+  )
+    return await failUnsubmittedTask(task);
 
   let generation: SeeApiGeneration;
   try {
     generation = await client.submit(
       task.id,
+      task.model,
       task.prompt,
       settings.data,
-      settings.data.firstFrame
+      settings.data.firstFrame,
+      settings.data.lastFrame
     );
   } catch (error) {
     if (error instanceof SeeApiVideoError && error.rejected)

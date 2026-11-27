@@ -308,14 +308,19 @@ export async function createFirstVideoCheckout(params: {
       continue;
     }
 
+    const matchesCurrentPack =
+      saved.amount === firstVideoPack.priceInCents &&
+      saved.currency === firstVideoPack.currency &&
+      saved.creditsAmount === firstVideoPack.credits;
     if (saved.paymentSessionId) {
-      const session = await provider.getPaymentSession({
+      let session = await provider.getPaymentSession({
         sessionId: saved.paymentSessionId,
       });
       if (session.paymentStatus === PaymentStatus.PROCESSING) {
-        if (session.paymentResult?.status === 'open' && saved.checkoutUrl)
-          return saved.checkoutUrl;
-        throw new FirstVideoPackUnavailableError();
+        if (session.paymentResult?.status !== 'open' || !saved.checkoutUrl)
+          throw new FirstVideoPackUnavailableError();
+        if (matchesCurrentPack) return saved.checkoutUrl;
+        session = await provider.expireCheckoutSession(saved.paymentSessionId);
       }
       await settleCheckoutOrder(saved, session, provider.name);
       if (session.paymentStatus === PaymentStatus.SUCCESS)
@@ -331,7 +336,7 @@ export async function createFirstVideoCheckout(params: {
       eq(order.status, OrderStatus.PENDING),
       isNull(order.paymentSessionId)
     );
-    if (Date.now() >= expiresAt * 1000) {
+    if (!matchesCurrentPack || Date.now() >= expiresAt * 1000) {
       // The URL was never exposed and this reservation can no longer pay.
       await db()
         .update(order)

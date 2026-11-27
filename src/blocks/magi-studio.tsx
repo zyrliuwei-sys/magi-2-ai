@@ -25,13 +25,14 @@ import {
   type MagiPromptId,
 } from '@/config/magi-content';
 import {
-  DEFAULT_VIDEO_RESOLUTION,
-  VIDEO_DURATIONS,
+  MAGI_VIDEO_MAX_DURATION,
+  MAGI_VIDEO_MAX_SEED,
+  MAGI_VIDEO_MIN_DURATION,
+  MAGI_VIDEO_RESOLUTION,
   VIDEO_IMAGE_LIMIT,
   VIDEO_IMAGE_TYPES,
   VIDEO_PROMPT_LIMIT,
   VIDEO_RATIOS,
-  VIDEO_RESOLUTIONS,
   videoCreditCost,
   videoIsActive,
   type VideoJob,
@@ -48,13 +49,77 @@ import { MagiLink } from './magi-site';
 
 const draftKey = 'magi-video-draft';
 const creditNumber = new Intl.NumberFormat('en-US');
+const studioDurations = Array.from(
+  { length: MAGI_VIDEO_MAX_DURATION - MAGI_VIDEO_MIN_DURATION + 1 },
+  (_, index) => MAGI_VIDEO_MIN_DURATION + index
+);
 const defaultSettings: VideoSettings = {
   mode: 'text-to-video',
   duration: 5,
   ratio: '16:9',
-  resolution: DEFAULT_VIDEO_RESOLUTION,
+  resolution: MAGI_VIDEO_RESOLUTION,
   audio: true,
 };
+
+function VideoFrameInput({
+  file,
+  preview,
+  label,
+  removeLabel,
+  onChoose,
+  onRemove,
+}: {
+  file?: File;
+  preview?: string;
+  label: string;
+  removeLabel: string;
+  onChoose: (file?: File) => void;
+  onRemove: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <div
+      className="magi-upload"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        onChoose(event.dataTransfer.files[0]);
+      }}
+    >
+      <input
+        type="file"
+        accept={VIDEO_IMAGE_TYPES.join(',')}
+        ref={input}
+        hidden
+        onChange={(event) => {
+          onChoose(event.target.files?.[0]);
+          event.currentTarget.value = '';
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        className="magi-upload-choice"
+      >
+        {preview ? <img src={preview} alt="" /> : <Upload size={17} />}
+        <span>
+          <strong>{label}</strong>
+          <small>{file?.name || m['video.studio.upload_hint']()}</small>
+        </span>
+      </button>
+      {file && (
+        <button
+          type="button"
+          className="magi-icon-button"
+          aria-label={removeLabel}
+          onClick={onRemove}
+        >
+          <X size={16} />
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function VideoDownload({ url }: { url: string }) {
   const download = useMutation({
@@ -136,12 +201,12 @@ export function MagiStudio({
     promptId ? m[`video.prompt.${promptId}.text`]() : ''
   );
   const [image, setImage] = useState<File>();
+  const [endingImage, setEndingImage] = useState<File>();
   const [needsStartingImage, setNeedsStartingImage] = useState(false);
   const [imageUrl, setImageUrl] = useState<string>();
   const [error, setError] = useState('');
   const [recentJob, setRecentJob] = useState<VideoJob>();
   const [referenceIndex, setReferenceIndex] = useState(0);
-  const fileInput = useRef<HTMLInputElement>(null);
   const promptInput = useRef<HTMLTextAreaElement>(null);
   const requestId = useRef<string | undefined>(undefined);
   const restoredJobId = useRef<string | undefined>(undefined);
@@ -160,7 +225,11 @@ export function MagiStudio({
         hadStartingImage?: boolean;
       };
       setPrompt(draft.prompt);
-      setSettings({ ...defaultSettings, ...draft.settings });
+      setSettings({
+        ...defaultSettings,
+        ...draft.settings,
+        resolution: MAGI_VIDEO_RESOLUTION,
+      });
       setNeedsStartingImage(draft.hadStartingImage === true);
     } catch {
       // Old or cleared drafts can be ignored.
@@ -212,6 +281,7 @@ export function MagiStudio({
     setPrompt(saved.prompt);
     setSettings({
       ...saved.settings,
+      resolution: MAGI_VIDEO_RESOLUTION,
       ratio:
         saved.settings.ratio === 'adaptive'
           ? defaultSettings.ratio
@@ -255,7 +325,7 @@ export function MagiStudio({
     setError('');
   }
 
-  function chooseImage(file: File | undefined) {
+  function chooseImage(file: File | undefined, ending = false) {
     if (!file) return;
     if (
       !VIDEO_IMAGE_TYPES.includes(file.type) ||
@@ -264,8 +334,11 @@ export function MagiStudio({
       setError(m['video.error.image']());
       return;
     }
-    setImage(file);
-    setNeedsStartingImage(false);
+    if (ending) setEndingImage(file);
+    else {
+      setImage(file);
+      setNeedsStartingImage(false);
+    }
     changeSettings({ mode: 'image-to-video' });
   }
 
@@ -316,7 +389,7 @@ export function MagiStudio({
       router.push('/pricing');
       return;
     }
-    if (!prompt.trim()) {
+    if (settings.mode === 'text-to-video' && !prompt.trim()) {
       setError(m['video.error.invalid']());
       promptInput.current?.focus();
       return;
@@ -331,7 +404,10 @@ export function MagiStudio({
       'input',
       JSON.stringify({ id: requestId.current, prompt, ...settings })
     );
-    if (settings.mode === 'image-to-video' && image) data.set('image', image);
+    if (settings.mode === 'image-to-video' && image) {
+      data.set('image', image);
+      if (endingImage) data.set('endingImage', endingImage);
+    }
     generate.mutate(data);
   }
 
@@ -365,52 +441,36 @@ export function MagiStudio({
           </button>
         </div>
         {settings.mode === 'image-to-video' && (
-          <div
-            className="magi-upload"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              chooseImage(event.dataTransfer.files[0]);
-            }}
-          >
-            <input
-              type="file"
-              accept={VIDEO_IMAGE_TYPES.join(',')}
-              ref={fileInput}
-              hidden
-              onChange={(event) => {
-                chooseImage(event.target.files?.[0]);
-                event.currentTarget.value = '';
+          <>
+            <VideoFrameInput
+              file={image}
+              preview={imageUrl}
+              label={m['video.studio.upload']()}
+              removeLabel={m['video.studio.remove']()}
+              onChoose={chooseImage}
+              onRemove={() => {
+                setImage(undefined);
+                requestId.current = undefined;
               }}
             />
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              className="magi-upload-choice"
-            >
-              {imageUrl ? <img src={imageUrl} alt="" /> : <Upload size={17} />}
-              <span>
-                <strong>{image?.name || m['video.studio.upload']()}</strong>
-                <small>{m['video.studio.upload_hint']()}</small>
-              </span>
-            </button>
-            {image && (
-              <button
-                type="button"
-                className="magi-icon-button"
-                aria-label={m['video.studio.remove']()}
-                onClick={() => {
-                  setImage(undefined);
-                  requestId.current = undefined;
-                }}
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
+            <VideoFrameInput
+              file={endingImage}
+              label={m['video.studio.upload_ending']()}
+              removeLabel={m['video.studio.remove_ending']()}
+              onChoose={(file) => chooseImage(file, true)}
+              onRemove={() => {
+                setEndingImage(undefined);
+                requestId.current = undefined;
+              }}
+            />
+          </>
         )}
         <div className="magi-prompt-label">
-          <label htmlFor={inputId}>{m['video.studio.prompt']()}</label>
+          <label htmlFor={inputId}>
+            {settings.mode === 'image-to-video'
+              ? m['video.studio.optional_prompt']()
+              : m['video.studio.prompt']()}
+          </label>
           <button className="magi-text-link" type="button" onClick={usePrompt}>
             {m['video.studio.sample_prompt']()}
           </button>
@@ -439,13 +499,11 @@ export function MagiStudio({
               value={settings.duration}
               onChange={(event) =>
                 changeSettings({
-                  duration: Number(
-                    event.target.value
-                  ) as VideoSettings['duration'],
+                  duration: Number(event.target.value),
                 })
               }
             >
-              {VIDEO_DURATIONS.map((n) => (
+              {studioDurations.map((n) => (
                 <option key={n} value={n}>
                   {m['video.studio.seconds']({ count: n })}
                 </option>
@@ -454,17 +512,8 @@ export function MagiStudio({
           </label>
           <label>
             {m['video.studio.resolution']()}
-            <select
-              value={settings.resolution}
-              onChange={(event) =>
-                changeSettings({
-                  resolution: event.target.value as VideoSettings['resolution'],
-                })
-              }
-            >
-              {VIDEO_RESOLUTIONS.map((resolution) => (
-                <option key={resolution}>{resolution}</option>
-              ))}
+            <select disabled value={MAGI_VIDEO_RESOLUTION}>
+              <option>{MAGI_VIDEO_RESOLUTION}</option>
             </select>
           </label>
           <label>
@@ -510,6 +559,27 @@ export function MagiStudio({
             </button>
           </div>
         </div>
+        <details className="magi-seed">
+          <summary>{m['video.studio.advanced']()}</summary>
+          <label>
+            {m['video.studio.seed']()}
+            <input
+              type="number"
+              min={0}
+              max={MAGI_VIDEO_MAX_SEED}
+              step={1}
+              placeholder={m['video.studio.seed_random']()}
+              value={settings.seed ?? ''}
+              onChange={(event) =>
+                changeSettings({
+                  seed: Number.isNaN(event.target.valueAsNumber)
+                    ? undefined
+                    : event.target.valueAsNumber,
+                })
+              }
+            />
+          </label>
+        </details>
         <button
           type="submit"
           className="magi-button magi-button-primary magi-generate"
@@ -540,9 +610,7 @@ export function MagiStudio({
           {!working && !generate.isPending && !purchaseRequired && (
             <span>
               {m['video.studio.credit']({
-                count: creditNumber.format(
-                  videoCreditCost(settings.duration, settings.resolution)
-                ),
+                count: creditNumber.format(videoCreditCost(settings.duration)),
               })}
             </span>
           )}

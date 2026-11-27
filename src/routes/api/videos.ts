@@ -21,7 +21,7 @@ import { m } from '@/paraglide/messages.js';
 
 const noStore = { 'Cache-Control': 'private, no-store' };
 const submitLimit = { intervalMs: 1600, keyPrefix: 'video-submit' };
-const maxBody = VIDEO_IMAGE_LIMIT + 32 * 1024;
+const maxBody = 2 * VIDEO_IMAGE_LIMIT + 128 * 1024;
 
 function fail(message: string, status: number) {
   return respErr(message, { status, headers: noStore });
@@ -47,7 +47,11 @@ async function POST({ request }: { request: Request }) {
       ? fail(m['video.error.image'](), 413)
       : fail(m['video.error.invalid'](), 400);
   }
-  if (form.getAll('image').length > 1 || form.getAll('input').length !== 1)
+  if (
+    form.getAll('image').length > 1 ||
+    form.getAll('endingImage').length > 1 ||
+    form.getAll('input').length !== 1
+  )
     return fail(m['video.error.invalid'](), 400);
   let raw: unknown;
   try {
@@ -57,15 +61,26 @@ async function POST({ request }: { request: Request }) {
   }
   const input = videoRequestSchema.safeParse(raw);
   if (!input.success) return fail(m['video.error.invalid'](), 400);
-  const image =
-    input.data.mode === 'image-to-video'
-      ? await validateReference(form.get('image'))
-      : undefined;
-  if (input.data.mode === 'image-to-video' && !image)
-    return fail(m['video.error.image'](), 400);
+  let image: File | undefined;
+  let endingImage: File | undefined;
+  if (input.data.mode === 'image-to-video') {
+    image = await validateReference(form.get('image'));
+    if (!image) return fail(m['video.error.image'](), 400);
+    if (form.has('endingImage')) {
+      endingImage = await validateReference(form.get('endingImage'));
+      if (!endingImage) return fail(m['video.error.image'](), 400);
+    }
+  } else if (form.has('image') || form.has('endingImage')) {
+    return fail(m['video.error.invalid'](), 400);
+  }
 
   try {
-    const job = await startVideoJob(session.user.id, input.data, image);
+    const job = await startVideoJob(
+      session.user.id,
+      input.data,
+      image,
+      endingImage
+    );
     return job
       ? respData(job, { headers: noStore })
       : fail(m['video.error.unavailable'](), 409);

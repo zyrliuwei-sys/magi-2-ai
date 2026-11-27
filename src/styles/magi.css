@@ -366,6 +366,32 @@
 .magi-upload-choice small {
   color: var(--magi-dim);
   font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+.magi-seed {
+  margin-bottom: 12px;
+  color: var(--magi-muted);
+  font-size: 0.8rem;
+}
+.magi-seed summary {
+  min-height: 40px;
+  align-content: center;
+  cursor: pointer;
+}
+.magi-seed label {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.magi-seed input {
+  width: min(100%, 240px);
+  min-height: 40px;
+  padding-inline: 9px;
+  border: 1px solid var(--magi-line);
+  border-radius: 8px;
+  color: var(--magi-ink);
+  background: var(--magi-field);
+  font-size: 1rem;
 }
 .magi-prompt-label {
   display: flex;

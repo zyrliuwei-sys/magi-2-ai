@@ -49,56 +49,56 @@ export type PricingProduct = {
 export const firstVideoPack = {
   productId: 'video_first_purchase',
   label: 'First Video Pack',
-  priceInCents: 999,
-  currency: 'usd',
-  credits: videoCreditCost(5, '480p') + videoCreditCost(5, '1080p'),
+  priceInCents: 990,
+  currency: 'cny',
+  credits: videoCreditCost(5),
 } as const;
 
 export const videoPlans = {
   oneTime: [
     {
       tier: 'starter',
-      productId: 'video_starter_once',
+      productId: 'video_starter_once_cny',
       label: 'Starter',
-      credits: videoCreditCost(5, '1080p'),
-      priceInCents: 1500,
+      credits: 6000,
+      priceInCents: 2990,
     },
     {
       tier: 'creator',
-      productId: 'video_creator_once',
+      productId: 'video_creator_once_cny',
       label: 'Creator',
-      credits: 28500,
-      priceInCents: 3900,
+      credits: 15000,
+      priceInCents: 6990,
     },
     {
       tier: 'studio',
-      productId: 'video_studio_once',
+      productId: 'video_studio_once_cny',
       label: 'Studio',
-      credits: 76000,
-      priceInCents: 8900,
+      credits: 36000,
+      priceInCents: 14990,
     },
   ],
   monthly: [
     {
       tier: 'starter',
-      productId: 'video_starter_monthly',
+      productId: 'video_starter_monthly_cny',
       label: 'Starter',
-      credits: 15200,
-      priceInCents: 1900,
+      credits: 10500,
+      priceInCents: 4990,
     },
     {
       tier: 'creator',
-      productId: 'video_creator_monthly',
+      productId: 'video_creator_monthly_cny',
       label: 'Creator',
-      credits: 45600,
-      priceInCents: 4900,
+      credits: 25500,
+      priceInCents: 10990,
     },
     {
       tier: 'studio',
-      productId: 'video_studio_monthly',
+      productId: 'video_studio_monthly_cny',
       label: 'Studio',
-      credits: 121600,
-      priceInCents: 11900,
+      credits: 60000,
+      priceInCents: 22990,
     },
   ],
 } as const;
@@ -111,7 +111,7 @@ const videoProducts = [
     description: `${credits} video credits`,
     type: PaymentType.ONE_TIME,
     priceInCents,
-    currency: 'usd',
+    currency: 'cny',
     credits,
   })),
   ...videoPlans.monthly.map(({ label, productId, credits, priceInCents }) => ({
@@ -121,12 +121,21 @@ const videoProducts = [
     description: `${credits} video credits per month`,
     type: PaymentType.SUBSCRIPTION,
     priceInCents,
-    currency: 'usd',
+    currency: 'cny',
     credits,
     creditsValidDays: 31,
     plan: { name: label, interval: PaymentInterval.MONTH, intervalCount: 1 },
   })),
 ] satisfies PricingProduct[];
+
+const archivedVideoPlans = [
+  ['video_starter_once', 'Starter', 1500, 10550, PaymentType.ONE_TIME],
+  ['video_creator_once', 'Creator', 3900, 28500, PaymentType.ONE_TIME],
+  ['video_studio_once', 'Studio', 8900, 76000, PaymentType.ONE_TIME],
+  ['video_starter_monthly', 'Starter', 1900, 15200, PaymentType.SUBSCRIPTION],
+  ['video_creator_monthly', 'Creator', 4900, 45600, PaymentType.SUBSCRIPTION],
+  ['video_studio_monthly', 'Studio', 11900, 121600, PaymentType.SUBSCRIPTION],
+] as const;
 
 export const pricingCatalog: Record<string, PricingProduct> = {
   [firstVideoPack.productId]: {
@@ -138,6 +147,24 @@ export const pricingCatalog: Record<string, PricingProduct> = {
   },
   ...Object.fromEntries(
     videoProducts.map((product) => [product.productId, product])
+  ),
+  ...Object.fromEntries(
+    archivedVideoPlans.map(
+      ([productId, label, priceInCents, credits, type]) => [
+        productId,
+        {
+          productId,
+          productName: label,
+          planName: label,
+          description: `${credits} video credits`,
+          priceInCents,
+          credits,
+          type,
+          currency: 'usd',
+          checkoutEnabled: false,
+        } satisfies PricingProduct,
+      ]
+    )
   ),
   // Retired template products. Existing orders and subscriptions retain their snapshots.
   starter_monthly: {

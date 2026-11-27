@@ -28,7 +28,7 @@ execFileSync(
 );
 
 const { db } = await import('../src/core/db');
-const { config } = await import('../src/config/db/schema');
+const { aiTask, config, user } = await import('../src/config/db/schema');
 const {
   saveConfigs,
   getAllConfigs,
@@ -41,6 +41,9 @@ const { getSettings, getSettingGroups } =
 const { getTestSpec, runTest } =
   await import('../src/modules/config/settings-test');
 const { normalizeSeeApiBaseUrl } = await import('../src/config/seeapi');
+const { createSeeApiVideoClient } = await import('../src/core/ai/seeapi-video');
+const { readVideoJob, videoRequestSchema } =
+  await import('../src/server/video-jobs');
 const key = 'seeapi-isolated-test-key';
 after(() => rm(directory, { recursive: true, force: true }));
 
@@ -164,7 +167,7 @@ test('connection tests use only authenticated GET /v1/credits and never echo pro
     requests++;
     assert.equal(String(input), 'https://api.seeapi.com/v1/credits');
     assert.equal(init?.method, 'GET');
-    assert.equal(init?.redirect, 'error');
+    assert.equal(init?.redirect, 'manual');
     assert.equal(
       new Headers(init?.headers).get('Authorization'),
       `Bearer ${key}`
@@ -182,7 +185,7 @@ test('connection tests use only authenticated GET /v1/credits and never echo pro
     assert.equal(result.success, true);
     assert.equal(requests, 1);
     assert(!JSON.stringify(result).includes(key));
-    for (const status of [401, 402, 403, 429, 500]) {
+    for (const status of [302, 401, 402, 403, 429, 500]) {
       globalThis.fetch = async () =>
         Response.json({ error: { message: key } }, { status });
       const failed = await runTest('seeapi', {}, { seeapi_api_key: key });
@@ -208,4 +211,156 @@ test('connection tests use only authenticated GET /v1/credits and never echo pro
   } finally {
     globalThis.fetch = nativeFetch;
   }
+});
+
+test('MAGI-2 sends supported controls and keeps image orientation adaptive', async (t) => {
+  const client = createSeeApiVideoClient({ seeapi_api_key: key });
+  assert.ok(client);
+  const id = crypto.randomUUID();
+  const textSettings = {
+    mode: 'text-to-video',
+    duration: 30,
+    ratio: '21:9',
+    resolution: '1080p',
+    audio: true,
+    seed: 0,
+  } as const;
+  const prompt = 'A studio camera moves toward the sculpture.';
+  const firstFrame = 'https://assets.example.test/first.webp';
+  const lastFrame = 'https://assets.example.test/last.png';
+  const { fetch } = globalThis;
+  const responses = [textSettings.mode, 'image-to-video'];
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async (...args: Parameters<typeof fetch>) => {
+      const [url, init] = args;
+      assert.equal(String(url), 'https://api.seeapi.com/v1/generations');
+      assert.equal(init?.redirect, 'manual');
+      assert.equal(new Headers(init?.headers).get('Idempotency-Key'), id);
+      const endpoint = responses.shift();
+      const request = JSON.parse(String(init?.body));
+      assert.equal(request.model, 'magi-2');
+      assert.equal(request.endpoint, endpoint);
+      assert.deepEqual(
+        request.input,
+        endpoint === 'text-to-video'
+          ? {
+              prompt,
+              duration_seconds: 30,
+              resolution: '1080p',
+              generate_audio: true,
+              seed: 0,
+              aspect_ratio: '21:9',
+            }
+          : {
+              duration_seconds: 4,
+              resolution: '1080p',
+              generate_audio: false,
+              seed: 0,
+              first_frame_image: firstFrame,
+              last_frame_image: lastFrame,
+            }
+      );
+      return Response.json({
+        generation: { id: 'task_test', status: 'processing' },
+      });
+    }
+  );
+  await client.submit(id, 'magi-2', prompt, textSettings);
+  const imageSettings = {
+    ...textSettings,
+    mode: 'image-to-video',
+    duration: 4,
+    audio: false,
+  } as const;
+  await client.submit(id, 'magi-2', '', imageSettings, firstFrame, lastFrame);
+  assert.equal(responses.length, 0);
+  assert.ok(
+    videoRequestSchema.safeParse({ id, prompt: '', ...imageSettings }).success
+  );
+  assert.ok(
+    !videoRequestSchema.safeParse({ id, prompt: '', ...textSettings }).success
+  );
+  assert.ok(
+    !videoRequestSchema.safeParse({
+      id,
+      prompt,
+      ...textSettings,
+      resolution: '480p',
+    }).success
+  );
+  assert.ok(
+    !videoRequestSchema.safeParse({ id, prompt, ...textSettings, duration: 31 })
+      .success
+  );
+});
+
+test('a pending pre-cutover task retries with its original body and keeps its charged credits', async (t) => {
+  await saveConfigs({ seeapi_api_key: key });
+  const userId = 'legacy-video-buyer';
+  await db().insert(user).values({
+    id: userId,
+    email: 'legacy-video@example.test',
+    name: 'Legacy video buyer',
+  });
+  const id = crypto.randomUUID();
+  const firstFrame = 'https://assets.example.test/old-frame.jpg';
+  const prompt = 'Animate the frame.';
+  await db()
+    .insert(aiTask)
+    .values({
+      id,
+      userId,
+      mediaType: 'video',
+      provider: 'seeapi',
+      model: 'seedance-2-5',
+      prompt,
+      costCredits: 4250,
+      status: 'pending',
+      updatedAt: new Date(Date.now() - 45_000),
+      options: JSON.stringify({
+        mode: 'image-to-video',
+        ratio: '9:16',
+        duration: 5,
+        resolution: '720p',
+        audio: false,
+        firstFrame,
+      }),
+    });
+  const { fetch } = globalThis;
+  const replay = t.mock.method(
+    globalThis,
+    'fetch',
+    async (...args: Parameters<typeof fetch>) => {
+      const [, init] = args;
+      assert.equal(new Headers(init?.headers).get('Idempotency-Key'), id);
+      assert.equal(
+        init?.body,
+        JSON.stringify({
+          model: 'seedance-2-5',
+          endpoint: 'image-to-video',
+          provider: 'seeapi',
+          input: {
+            prompt,
+            aspect_ratio: 'adaptive',
+            duration_seconds: 5,
+            resolution: '720p',
+            generate_audio: false,
+            first_frame_image: firstFrame,
+            output_format: 'mp4',
+            nsfw_checker: true,
+          },
+        })
+      );
+      return Response.json({
+        generation: { id: 'task_legacy', status: 'processing' },
+      });
+    }
+  );
+  const job = await readVideoJob(userId, id);
+  assert.equal(replay.mock.callCount(), 1);
+  assert.equal(job?.status, 'processing');
+  assert.equal(job?.cost, 4250);
+  assert.equal(job?.settings.resolution, '720p');
 });

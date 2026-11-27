@@ -91,9 +91,14 @@ async function POST({ request }: { request: Request }) {
       });
       return respData({ checkout_url: checkoutUrl });
     }
+    const isVideoPack =
+      product.currency === 'cny' && product.productId.startsWith('video_');
+    if (isVideoPack && payment_provider && payment_provider !== 'stripe')
+      return respErr(m['video.pricing.offline'](), { status: 400 });
+    const provider = isVideoPack ? 'stripe' : payment_provider;
     const charge = await resolveCharge({
       product,
-      paymentProvider: payment_provider,
+      paymentProvider: provider,
       userId: session.user.id,
       configs,
     });
@@ -127,6 +132,7 @@ async function POST({ request }: { request: Request }) {
       paymentOrder: {
         productId: product.productId,
         price: { amount: chargeAmount, currency },
+        cardOnly: isVideoPack,
         type: product.type,
         description: product.description,
         successUrl,
@@ -143,7 +149,7 @@ async function POST({ request }: { request: Request }) {
             }
           : undefined,
       },
-      provider: payment_provider,
+      provider,
     });
 
     return respData({ checkout_url: checkout.checkoutInfo.checkoutUrl });

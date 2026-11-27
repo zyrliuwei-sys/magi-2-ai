@@ -170,10 +170,23 @@ const grantsFor = (orderNo: string) =>
 
 let user = 0;
 for (const mode of MODES) {
-  test(`[${mode}] Seedance submission retries charge once and concurrent failure polling restores once`, async (t) => {
+  test(`[${mode}] MAGI-2 submission retries charge once and concurrent failure polling restores once`, async (t) => {
     setAtomicModeForTests(mode);
     const u = `u${user++}`;
-    await grantCredits(u, 5000);
+    const purchase = await createdOrder(u, 5000);
+    const session = paid(purchase.orderNo);
+    await settleCheckoutOrder(
+      purchase,
+      {
+        ...session,
+        paymentInfo: {
+          ...session.paymentInfo,
+          paymentAmount: 500,
+          paymentCurrency: 'usd',
+        },
+      },
+      'stripe'
+    );
     await saveConfigs({ seeapi_api_key: 'fake-seeapi-test-key' });
     const realFetch = globalThis.fetch;
     let submissions = 0;
@@ -182,7 +195,7 @@ for (const mode of MODES) {
       mode: 'text-to-video',
       prompt: 'A sparrow lands on a garden gate.',
       duration: 5,
-      resolution: '720p',
+      resolution: '1080p',
       ratio: '9:16',
       audio: false,
     } as const;
@@ -200,31 +213,26 @@ for (const mode of MODES) {
             input.id
           );
           assert.deepEqual(JSON.parse(String(init.body)), {
-            model: 'seedance-2-5',
+            model: 'magi-2',
             endpoint: 'text-to-video',
             provider: 'seeapi',
             input: {
               prompt: input.prompt,
               aspect_ratio: input.ratio,
               duration_seconds: 5,
-              resolution: '720p',
+              resolution: '1080p',
               generate_audio: false,
-              output_format: 'mp4',
-              nsfw_checker: true,
             },
           });
           if (submissions === 1)
             throw new Error('Connection closed after request');
           return Response.json({
-            generation: { id: 'task_seedance', status: 'processing' },
+            generation: { id: 'task_magi', status: 'processing' },
           });
         }
-        assert.equal(
-          url,
-          'https://api.seeapi.com/v1/generations/task_seedance'
-        );
+        assert.equal(url, 'https://api.seeapi.com/v1/generations/task_magi');
         return Response.json({
-          generation: { id: 'task_seedance', status: 'refunded' },
+          generation: { id: 'task_magi', status: 'refunded' },
         });
       }
     );
@@ -236,9 +244,9 @@ for (const mode of MODES) {
     assert.equal(submissions, 1);
     assert.deepEqual(
       jobs.map((job) => job?.cost),
-      [4250, 4250]
+      [1500, 1500]
     );
-    assert.equal(await getBalance(u), 750);
+    assert.equal(await getBalance(u), 3500);
     assert.equal(await readVideoJob('u39', input.id), undefined);
 
     await db()
