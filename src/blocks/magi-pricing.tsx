@@ -4,7 +4,11 @@ import { ArrowUpRight, Check, Coins } from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
-import { VIDEO_DURATIONS, videoCreditCost } from '@/config/magi-video';
+import {
+  MAGI_VIDEO_MAX_DURATION,
+  VIDEO_DURATIONS,
+  videoCreditCost,
+} from '@/config/magi-video';
 import { firstVideoPack, videoPlans } from '@/config/pricing';
 import { apiPost } from '@/lib/api-client';
 import { m } from '@/paraglide/messages.js';
@@ -58,7 +62,7 @@ export function CreditEstimate({ compact = false }: { compact?: boolean }) {
               </tr>
             </thead>
             <tbody>
-              {[4, ...VIDEO_DURATIONS, 30].map((duration) => (
+              {[...VIDEO_DURATIONS, MAGI_VIDEO_MAX_DURATION].map((duration) => (
                 <tr key={duration}>
                   <th scope="row">
                     {m['video.studio.seconds']({ count: duration })}

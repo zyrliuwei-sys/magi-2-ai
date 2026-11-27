@@ -39,13 +39,10 @@ import { getBalance } from '@/modules/credits/service';
 import { getVideoPurchaseStatus } from '@/modules/payment/service';
 import { getStorage } from '@/modules/storage/service';
 
+const durationSchema = z.number().int().max(MAGI_VIDEO_MAX_DURATION);
 const settingsSchema = z.object({
   mode: z.enum(VIDEO_MODES),
-  duration: z
-    .number()
-    .int()
-    .min(MAGI_VIDEO_MIN_DURATION)
-    .max(MAGI_VIDEO_MAX_DURATION),
+  duration: durationSchema.min(MAGI_VIDEO_MIN_DURATION),
   ratio: z.enum(VIDEO_RATIOS),
   resolution: z.literal(MAGI_VIDEO_RESOLUTION),
   audio: z.boolean(),
@@ -62,6 +59,8 @@ export const videoRequestSchema = settingsSchema
   );
 const httpsUrl = z.url({ protocol: /^https$/ });
 const storedSettings = settingsSchema.extend({
+  // Jobs created before the five-second minimum retain their original request.
+  duration: durationSchema.min(4),
   resolution: z.enum(VIDEO_RESOLUTIONS).default(MAGI_VIDEO_RESOLUTION),
   firstFrame: httpsUrl.optional(),
   lastFrame: httpsUrl.optional(),

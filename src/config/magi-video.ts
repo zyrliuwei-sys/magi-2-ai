@@ -1,5 +1,5 @@
 export const VIDEO_DURATIONS = [5, 10, 15] as const;
-export const MAGI_VIDEO_MIN_DURATION = 4;
+export const MAGI_VIDEO_MIN_DURATION = 5;
 export const MAGI_VIDEO_MAX_DURATION = 30;
 export const MAGI_VIDEO_RESOLUTION = '1080p';
 export const MAGI_VIDEO_MAX_SEED = 2_147_483_647;

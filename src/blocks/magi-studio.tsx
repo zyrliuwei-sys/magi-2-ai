@@ -55,7 +55,7 @@ const studioDurations = Array.from(
 );
 const defaultSettings: VideoSettings = {
   mode: 'text-to-video',
-  duration: 5,
+  duration: MAGI_VIDEO_MIN_DURATION,
   ratio: '16:9',
   resolution: MAGI_VIDEO_RESOLUTION,
   audio: true,
@@ -228,6 +228,10 @@ export function MagiStudio({
       setSettings({
         ...defaultSettings,
         ...draft.settings,
+        duration: Math.max(
+          draft.settings?.duration ?? MAGI_VIDEO_MIN_DURATION,
+          MAGI_VIDEO_MIN_DURATION
+        ),
         resolution: MAGI_VIDEO_RESOLUTION,
       });
       setNeedsStartingImage(draft.hadStartingImage === true);
@@ -281,6 +285,7 @@ export function MagiStudio({
     setPrompt(saved.prompt);
     setSettings({
       ...saved.settings,
+      duration: Math.max(saved.settings.duration, MAGI_VIDEO_MIN_DURATION),
       resolution: MAGI_VIDEO_RESOLUTION,
       ratio:
         saved.settings.ratio === 'adaptive'

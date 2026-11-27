@@ -254,7 +254,7 @@ test('MAGI-2 sends supported controls and keeps image orientation adaptive', asy
               aspect_ratio: '21:9',
             }
           : {
-              duration_seconds: 4,
+              duration_seconds: 5,
               resolution: '1080p',
               generate_audio: false,
               seed: 0,
@@ -271,7 +271,7 @@ test('MAGI-2 sends supported controls and keeps image orientation adaptive', asy
   const imageSettings = {
     ...textSettings,
     mode: 'image-to-video',
-    duration: 4,
+    duration: 5,
     audio: false,
   } as const;
   await client.submit(id, 'magi-2', '', imageSettings, firstFrame, lastFrame);
@@ -279,6 +279,13 @@ test('MAGI-2 sends supported controls and keeps image orientation adaptive', asy
   assert.ok(
     videoRequestSchema.safeParse({ id, prompt: '', ...imageSettings }).success
   );
+  for (const settings of [textSettings, imageSettings]) {
+    assert.equal(
+      videoRequestSchema.safeParse({ id, prompt, ...settings, duration: 4 })
+        .success,
+      false
+    );
+  }
   assert.ok(
     !videoRequestSchema.safeParse({ id, prompt: '', ...textSettings }).success
   );
@@ -363,4 +370,53 @@ test('a pending pre-cutover task retries with its original body and keeps its ch
   assert.equal(job?.status, 'processing');
   assert.equal(job?.cost, 4250);
   assert.equal(job?.settings.resolution, '720p');
+});
+
+test('an existing four-second MAGI-2 video can be retried at its original duration', async (t) => {
+  await saveConfigs({ seeapi_api_key: key });
+  const userId = 'four-second-video-buyer';
+  await db().insert(user).values({
+    id: userId,
+    email: 'four-second-video@example.test',
+    name: 'Video buyer',
+  });
+  const id = crypto.randomUUID();
+  await db()
+    .insert(aiTask)
+    .values({
+      id,
+      userId,
+      mediaType: 'video',
+      provider: 'seeapi',
+      model: 'magi-2',
+      prompt: 'A shot of the harbor.',
+      costCredits: 1200,
+      status: 'pending',
+      updatedAt: new Date(Date.now() - 45_000),
+      options: JSON.stringify({
+        mode: 'text-to-video',
+        ratio: '16:9',
+        duration: 4,
+        resolution: '1080p',
+        audio: false,
+      }),
+    });
+  const { fetch } = globalThis;
+  const replay = t.mock.method(
+    globalThis,
+    'fetch',
+    async (...args: Parameters<typeof fetch>) => {
+      const [, init] = args;
+      assert.equal(new Headers(init?.headers).get('Idempotency-Key'), id);
+      assert.equal(JSON.parse(String(init?.body)).input.duration_seconds, 4);
+      return Response.json({
+        generation: { id: 'task_four_seconds', status: 'processing' },
+      });
+    }
+  );
+  const job = await readVideoJob(userId, id);
+  assert.equal(replay.mock.callCount(), 1);
+  assert.equal(job?.status, 'processing');
+  assert.equal(job?.settings.duration, 4);
+  assert.equal(job?.cost, 1200);
 });
