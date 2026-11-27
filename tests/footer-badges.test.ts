@@ -151,6 +151,32 @@ test('invalid URLs and oversized payloads are rejected without changing stored b
   assert.deepEqual(parseStoredFooterBadges('broken JSON'), []);
 });
 
+test('text badges save with safe metadata and older image badges still load', async () => {
+  globalThis.__minIntervalRateLimitStore?.clear();
+  const text = {
+    href: 'https://directory.example.test/',
+    text: 'Directory & Tools',
+    alt: 'Directory & Tools',
+    attributes: { 'data-verification': 'directory' },
+  };
+  const saved = await call('footer_badges_update', { badges: [text, badge] });
+  assert.equal(saved.status, 200);
+  const stored = parseStoredFooterBadges(await getStoredFooterBadges());
+  assert.equal(stored[0].text, text.text);
+  assert.equal(stored[0].src, undefined);
+  assert.deepEqual(stored[0].attributes, text.attributes);
+  assert.equal(stored[1].src, badge.src);
+  assert.throws(
+    () =>
+      validateFooterBadges([{ ...text, attributes: { onclick: 'blocked' } }]),
+    /Invalid badge attribute/
+  );
+  assert.deepEqual(
+    parseStoredFooterBadges(JSON.stringify([null, text, badge])),
+    stored
+  );
+});
+
 test('general and custom settings cannot overwrite or remove module-managed badges', async () => {
   const before = await getStoredFooterBadges();
   await saveConfigs({ footer_badges: '[]' });

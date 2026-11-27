@@ -4,9 +4,11 @@ import { validateFooterBadges } from './validation';
 const ANCHOR_ATTRIBUTES = new Set(['href', 'target', 'rel']);
 const IMAGE_ATTRIBUTES = new Set(['src', 'alt', 'width', 'height', 'loading']);
 
-function hasOnlyAllowedAttributes(element: Element, allowed: Set<string>) {
-  return Array.from(element.attributes).every((attribute) =>
-    allowed.has(attribute.name.toLowerCase())
+function extraAttributes(element: Element, standard: Set<string>) {
+  return Object.fromEntries(
+    Array.from(element.attributes)
+      .filter(({ name }) => !standard.has(name))
+      .map(({ name, value }) => [name, value])
   );
 }
 
@@ -16,11 +18,7 @@ function hasOnlyWhitespaceText(element: Element) {
   );
 }
 
-/**
- * Extract safe link/image data from pasted badge snippets without rendering
- * submitted HTML. Only <a><img></a> markup and a small attribute allowlist are
- * accepted; the server validates the extracted values again before saving.
- */
+/** Extract HTTPS link text or image data without rendering pasted HTML. */
 export function parseFooterBadgeMarkup(markup: string): FooterBadge[] {
   if (!markup.trim() || markup.length > 20_000) {
     throw new Error('invalid_markup');
@@ -36,38 +34,37 @@ export function parseFooterBadgeMarkup(markup: string): FooterBadge[] {
     throw new Error('invalid_markup');
   }
 
-  const badges = elements.map((anchor) => {
-    if (
-      !hasOnlyAllowedAttributes(anchor, ANCHOR_ATTRIBUTES) ||
-      (anchor.getAttribute('target') &&
-        anchor.getAttribute('target') !== '_blank') ||
-      !hasOnlyWhitespaceText(anchor)
-    ) {
-      throw new Error('invalid_markup');
-    }
-
-    const children = Array.from(anchor.children);
-    if (children.length !== 1 || children[0]?.tagName !== 'IMG') {
-      throw new Error('invalid_markup');
-    }
-
-    const image = children[0];
-    if (!hasOnlyAllowedAttributes(image, IMAGE_ATTRIBUTES)) {
-      throw new Error('invalid_markup');
-    }
-
-    return {
-      href: anchor.getAttribute('href') ?? '',
-      src: image.getAttribute('src') ?? '',
-      alt: image.getAttribute('alt') ?? '',
-      width: image.hasAttribute('width')
-        ? Number(image.getAttribute('width'))
-        : 250,
-      height: image.hasAttribute('height')
-        ? Number(image.getAttribute('height'))
-        : undefined,
-    };
-  });
-
-  return validateFooterBadges(badges);
+  return validateFooterBadges(
+    elements.map((anchor) => {
+      const href = anchor.getAttribute('href') ?? '';
+      const target = anchor.getAttribute('target');
+      const children = Array.from(anchor.children);
+      if (
+        (target && target !== '_blank' && target !== '_self') ||
+        children.length > 1 ||
+        (children.length === 1 && children[0].tagName !== 'IMG')
+      ) {
+        throw new Error('invalid_markup');
+      }
+      const image = children[0];
+      const text = anchor.textContent?.trim();
+      return {
+        href,
+        text,
+        src: image ? (image.getAttribute('src') ?? '') : undefined,
+        alt: image ? (image.getAttribute('alt') ?? '') : text?.slice(0, 120),
+        rel: anchor.getAttribute('rel'),
+        attributes: extraAttributes(anchor, ANCHOR_ATTRIBUTES),
+        imageAttributes: image
+          ? extraAttributes(image, IMAGE_ATTRIBUTES)
+          : undefined,
+        width: image?.hasAttribute('width')
+          ? Number(image.getAttribute('width'))
+          : undefined,
+        height: image?.hasAttribute('height')
+          ? Number(image.getAttribute('height'))
+          : undefined,
+      };
+    })
+  );
 }

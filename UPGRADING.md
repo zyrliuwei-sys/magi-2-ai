@@ -4,6 +4,12 @@ Read this when a project built from this template pulls newer template code.
 Entries are newest first. Apply **every entry dated after the template version
 the project last pulled**, oldest of those first.
 
+## 2026-11-27 — Accept text links in footer badges
+
+The footer badge editor accepts plain HTTPS anchors with text alongside
+existing linked images. Saved text links appear in the public HTML. A malformed
+old badge is skipped individually. No database migration is required.
+
 ## How to upgrade (every time)
 
 1. **Find the baseline.** The last template commit the project took. Check
