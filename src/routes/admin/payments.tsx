@@ -11,6 +11,7 @@ import { Pencil, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { tDynamic } from '@/core/i18n/dynamic';
+import { firstVideoPack } from '@/config/pricing';
 import { apiGet, apiPatch, apiPost, type PageResult } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -98,6 +99,8 @@ function PaymentsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState('all');
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const editingFirstVideoPack =
+    editingOrder?.productId === firstVideoPack.productId;
   const [refundingOrder, setRefundingOrder] = useState<Order | null>(null);
   const [refundCredits, setRefundCredits] = useState('');
   const [refundReason, setRefundReason] = useState('');
@@ -408,7 +411,9 @@ function PaymentsPage() {
           <DialogHeader>
             <DialogTitle>{m['admin.payments.edit_title']()}</DialogTitle>
             <DialogDescription>
-              {m['admin.payments.edit_description']()}
+              {editingFirstVideoPack
+                ? m['admin.payments.first_video_pack_managed']()
+                : m['admin.payments.edit_description']()}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -428,6 +433,7 @@ function PaymentsPage() {
                   <div className="space-y-1.5">
                     <Label>{m['admin.payments.status_label']()}</Label>
                     <Select
+                      disabled={editingFirstVideoPack}
                       value={field.state.value}
                       onValueChange={(value) => field.handleChange(value || '')}
                     >
@@ -473,6 +479,9 @@ function PaymentsPage() {
                           ]()}
                         </Label>
                         <Input
+                          disabled={
+                            editingFirstVideoPack && name === 'productId'
+                          }
                           value={field.state.value}
                           onChange={(event) =>
                             field.handleChange(event.target.value)

@@ -5,6 +5,7 @@ import {
   readVideoJob,
   startVideoJob,
   validateReference,
+  VideoPurchaseRequiredError,
   videoRequestSchema,
   VideoUnavailableError,
 } from '@/server/video-jobs';
@@ -13,6 +14,7 @@ import { z } from 'zod';
 import { getAuth } from '@/core/auth';
 import { VIDEO_IMAGE_LIMIT } from '@/config/magi-video';
 import { getBalance } from '@/modules/credits/service';
+import { getVideoPurchaseStatus } from '@/modules/payment/service';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
 import { m } from '@/paraglide/messages.js';
@@ -68,6 +70,8 @@ async function POST({ request }: { request: Request }) {
       ? respData(job, { headers: noStore })
       : fail(m['video.error.unavailable'](), 409);
   } catch (error) {
+    if (error instanceof VideoPurchaseRequiredError)
+      return fail(m['video.error.purchase_required'](), 402);
     if (error instanceof VideoUnavailableError)
       return fail(
         error.mode === 'image-to-video'
@@ -84,9 +88,10 @@ async function POST({ request }: { request: Request }) {
 async function GET({ request }: { request: Request }) {
   const query = new URL(request.url).searchParams;
   const id = query.get('task');
+  const access = query.get('access') === '1';
   const readLimit = {
     intervalMs: 1600,
-    keyPrefix: id ? 'video-status' : 'video-history',
+    keyPrefix: id ? 'video-status' : access ? 'video-access' : 'video-history',
   };
   const ipLimit = enforceMinIntervalRateLimit(request, readLimit);
   if (ipLimit) return ipLimit;
@@ -105,6 +110,11 @@ async function GET({ request }: { request: Request }) {
       ? respData(job, { headers: noStore })
       : fail(m['video.error.missing'](), 404);
   }
+
+  if (access)
+    return respData(await getVideoPurchaseStatus(session.user.id), {
+      headers: noStore,
+    });
 
   const page = Math.min(
     1000,

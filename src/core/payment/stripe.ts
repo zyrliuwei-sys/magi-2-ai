@@ -54,8 +54,10 @@ export class StripeProvider implements PaymentProvider {
 
   async createPayment({
     order,
+    reservation,
   }: {
     order: PaymentOrder;
+    reservation?: { key: string; expiresAt: number };
   }): Promise<CheckoutSession> {
     try {
       // check payment price
@@ -94,7 +96,7 @@ export class StripeProvider implements PaymentProvider {
 
       // set or create customer
       let customerId = '';
-      if (order.customer?.email) {
+      if (order.customer?.email && !reservation) {
         const customers = await this.client.customers.list({
           email: order.customer.email,
           limit: 1,
@@ -134,7 +136,11 @@ export class StripeProvider implements PaymentProvider {
       }
 
       // allow user input promotion code
-      if (this.configs.allowPromotionCodes && !sessionParams.discounts) {
+      if (reservation) {
+        sessionParams.expires_at = reservation.expiresAt;
+        sessionParams.payment_method_types = ['card'];
+        sessionParams.customer_email = order.customer?.email;
+      } else if (this.configs.allowPromotionCodes && !sessionParams.discounts) {
         sessionParams.allow_promotion_codes = true;
       }
 
@@ -191,7 +197,10 @@ export class StripeProvider implements PaymentProvider {
         sessionParams.cancel_url = order.cancelUrl;
       }
 
-      const session = await this.client.checkout.sessions.create(sessionParams);
+      const session = await this.client.checkout.sessions.create(
+        sessionParams,
+        reservation ? { idempotencyKey: reservation.key } : undefined
+      );
       if (!session.id || !session.url) {
         throw new Error('create payment failed');
       }

@@ -2,8 +2,10 @@ import { and, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
 
 import { affectedRows, db } from '@/core/db';
 import { order, user } from '@/config/db/schema';
+import { firstVideoPack } from '@/config/pricing';
 import { respErr, respOk, respPage } from '@/lib/resp';
 import { keywordMatch } from '@/lib/sql-search';
+import { m } from '@/paraglide/messages.js';
 
 import type { AdminHandlerContext } from '../types';
 
@@ -105,7 +107,7 @@ export async function PATCH({ request, actor }: AdminHandlerContext) {
       await request.json();
     if (!orderNo) return respErr('orderNo is required');
     const [current] = await db()
-      .select({ status: order.status })
+      .select({ status: order.status, productId: order.productId })
       .from(order)
       .where(eq(order.orderNo, orderNo))
       .limit(1);
@@ -113,6 +115,15 @@ export async function PATCH({ request, actor }: AdminHandlerContext) {
     // The edit form always sends the current status; only a real change is checked.
     const statusChange =
       status !== undefined && status !== '' && status !== current.status;
+    const productChange =
+      productId !== undefined && productId !== current.productId;
+    const isFirstVideoPack = current.productId === firstVideoPack.productId;
+    if (
+      (isFirstVideoPack && (statusChange || productChange)) ||
+      (productChange && productId === firstVideoPack.productId)
+    ) {
+      return respErr(m['admin.payments.first_video_pack_managed']());
+    }
     if (
       statusChange &&
       !(status === CLOSED_STATUS && CLOSABLE_STATUSES.includes(current.status))

@@ -2,12 +2,17 @@ import { createFileRoute } from '@tanstack/react-router';
 import { resolveCharge } from '@/server/payment/charge';
 
 import { getAuth } from '@/core/auth';
-import { getPricingProduct } from '@/config/pricing';
+import { firstVideoPack, getPricingProduct } from '@/config/pricing';
 import { getAllConfigs } from '@/modules/config/service';
-import { createCheckout } from '@/modules/payment/service';
+import {
+  createCheckout,
+  createFirstVideoCheckout,
+  FirstVideoPackUnavailableError,
+} from '@/modules/payment/service';
 import { localizedPath } from '@/lib/locale-path';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
+import { m } from '@/paraglide/messages.js';
 
 function safeSameOriginPath(
   input: string | undefined | null,
@@ -72,6 +77,20 @@ async function POST({ request }: { request: Request }) {
     // Catalog price for the chosen provider (CNY providers, admin test
     // amounts): see resolveCharge.
     const configs = await getAllConfigs();
+    if (product.productId === firstVideoPack.productId) {
+      if (request.headers.get('origin') !== new URL(request.url).origin)
+        return respErr('Same-origin request required', { status: 403 });
+      if (payment_provider && payment_provider !== 'stripe')
+        return respErr(m['video.pricing.first_pack_unavailable'](), {
+          status: 400,
+        });
+      const checkoutUrl = await createFirstVideoCheckout({
+        userId: session.user.id,
+        userEmail: session.user.email,
+        appUrl: configs.app_url || new URL(request.url).origin,
+      });
+      return respData({ checkout_url: checkoutUrl });
+    }
     const charge = await resolveCharge({
       product,
       paymentProvider: payment_provider,
@@ -129,6 +148,11 @@ async function POST({ request }: { request: Request }) {
 
     return respData({ checkout_url: checkout.checkoutInfo.checkoutUrl });
   } catch (error) {
+    if (error instanceof FirstVideoPackUnavailableError) {
+      return respErr(m['video.pricing.first_pack_unavailable'](), {
+        status: 409,
+      });
+    }
     console.error(
       'checkout error:',
       error instanceof Error ? error.name : 'Unknown error'

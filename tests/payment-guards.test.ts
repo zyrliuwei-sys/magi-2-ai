@@ -12,6 +12,7 @@ Object.assign(process.env, {
   DATABASE_PROVIDER: 'sqlite',
   DATABASE_URL: `file:${directory}/test.db`,
   AUTH_SECRET: 'isolated-guards-test-secret-not-a-real-credential',
+  STRIPE_SECRET_KEY: 'unit-test-placeholder',
   NODE_ENV: 'test',
   VITE_APP_URL: 'http://localhost:3000',
 });
@@ -29,14 +30,24 @@ execFileSync(
 );
 const { db } = await import('../src/core/db');
 const schema = await import('../src/config/db/schema');
-const { settleCheckoutOrder } = await import('../src/modules/payment/service');
+const {
+  createFirstVideoCheckout,
+  FirstVideoPackUnavailableError,
+  getVideoPurchaseStatus,
+  settleCheckoutOrder,
+} = await import('../src/modules/payment/service');
+const { StripeProvider } = await import('../src/core/payment/stripe');
+const { PaymentStatus } = await import('../src/core/payment/types');
+const { startVideoJob, VideoPurchaseRequiredError } =
+  await import('../src/server/video-jobs');
 const { assertEndpointSecretsResupplied } =
   await import('../src/modules/config/service');
 const { enforceMinIntervalRateLimit } = await import('../src/lib/rate-limit');
 const { PATCH: patchOrder } =
   await import('../src/server/admin/handlers/orders');
 const { isValidEmbedSetting } = await import('../src/lib/embed-ids');
-const { getPricingProduct, videoPlans } = await import('../src/config/pricing');
+const { firstVideoPack, getPricingProduct, videoPlans } =
+  await import('../src/config/pricing');
 
 before(async () => {
   await db()
@@ -100,6 +111,177 @@ test('each video price resolves to its server-side credits and billing frequency
     false
   );
   assert.equal(getPricingProduct('__proto__'), null);
+});
+
+test('video generation requires a confirmed, nonzero credit purchase', async () => {
+  const userId = 'video-access';
+  await db()
+    .insert(schema.user)
+    .values({ id: userId, name: 'Video user', email: 'access@example.test' });
+  await db().insert(schema.credit).values({
+    id: 'video-bonus',
+    userId,
+    transactionNo: 'video-bonus',
+    transactionType: 'grant',
+    credits: 12450,
+    remainingCredits: 12450,
+    status: 'active',
+  });
+  await db().insert(schema.order).values({
+    id: 'unpaid-access-order',
+    orderNo: 'unpaid-access-order',
+    userId,
+    status: 'created',
+    amount: 1500,
+    currency: 'usd',
+    checkoutInfo: '{}',
+    paymentProvider: 'stripe',
+    creditsAmount: 10550,
+  });
+  const input = {
+    id: crypto.randomUUID(),
+    prompt: 'A camera moves past a sculpture',
+    mode: 'text-to-video',
+    duration: 5,
+    resolution: '1080p',
+    ratio: '16:9',
+    audio: true,
+  } as const;
+  await assert.rejects(
+    startVideoJob(userId, input),
+    VideoPurchaseRequiredError
+  );
+  assert.deepEqual(await getVideoPurchaseStatus(userId), {
+    canGenerate: false,
+    firstPurchaseEligible: true,
+  });
+  await db()
+    .update(schema.order)
+    .set({ status: 'paid', paymentAmount: 0 })
+    .where(eq(schema.order.id, 'unpaid-access-order'));
+  await assert.rejects(
+    startVideoJob(userId, input),
+    VideoPurchaseRequiredError
+  );
+  await db()
+    .update(schema.order)
+    .set({ paymentAmount: 1500 })
+    .where(eq(schema.order.id, 'unpaid-access-order'));
+  assert.deepEqual(await getVideoPurchaseStatus(userId), {
+    canGenerate: true,
+    firstPurchaseEligible: false,
+  });
+  await db()
+    .update(schema.order)
+    .set({ status: 'refunded' })
+    .where(eq(schema.order.id, 'unpaid-access-order'));
+  assert.deepEqual(await getVideoPurchaseStatus(userId), {
+    canGenerate: false,
+    firstPurchaseEligible: false,
+  });
+  await assert.rejects(
+    startVideoJob(userId, input),
+    VideoPurchaseRequiredError
+  );
+});
+
+test('first pack checkout resumes one session, retries expiry and grants credits once', async (t) => {
+  const userId = 'new-buyer';
+  const appUrl = 'https://video.example.test';
+  const userEmail = 'new-buyer@example.test';
+  await db().insert(schema.user).values({
+    id: userId,
+    name: 'New Buyer',
+    email: userEmail,
+  });
+  const keys = new Set<string>();
+  let expired = false;
+  t.mock.method(
+    StripeProvider.prototype,
+    'createPayment',
+    async (
+      params: Parameters<
+        InstanceType<typeof StripeProvider>['createPayment']
+      >[0]
+    ) => {
+      assert.deepEqual(params.order.price, { currency: 'usd', amount: 999 });
+      assert.ok(params.order.successUrl && params.reservation);
+      const callback = new URL(params.order.successUrl);
+      assert.equal(callback.origin, appUrl);
+      assert.ok(callback.searchParams.get('order_no'));
+      const key = params.reservation.key;
+      assert.ok(params.reservation.expiresAt > Date.now() / 1000);
+      keys.add(key);
+      return {
+        provider: 'stripe',
+        checkoutInfo: {
+          sessionId: key,
+          checkoutUrl: `https://checkout.stripe.com/${key}`,
+        },
+        checkoutResult: {},
+      };
+    }
+  );
+  t.mock.method(StripeProvider.prototype, 'getPaymentSession', async () => ({
+    paymentStatus: expired ? PaymentStatus.CANCELED : PaymentStatus.PROCESSING,
+    paymentResult: { status: expired ? 'expired' : 'open' },
+  }));
+  const request = { userId, userEmail, appUrl };
+  const [one, two] = await Promise.all([
+    createFirstVideoCheckout(request),
+    createFirstVideoCheckout(request),
+  ]);
+  assert.equal(one, two);
+  assert.equal(await createFirstVideoCheckout(request), one);
+  assert.equal(keys.size, 1);
+  assert.equal((await getVideoPurchaseStatus(userId)).canGenerate, false);
+  expired = true;
+  const replacement = await createFirstVideoCheckout(request);
+  assert.notEqual(one, replacement);
+  assert.equal(keys.size, 2);
+  const [reserved] = await db()
+    .select()
+    .from(schema.order)
+    .where(eq(schema.order.checkoutUrl, replacement));
+  assert.equal(reserved.productId, firstVideoPack.productId);
+  assert.equal(reserved.creditsAmount, 12450);
+  assert.equal(reserved.status, 'created');
+  const manualClose = await patchOrder({
+    request: new Request('http://localhost/api/admin/orders', {
+      method: 'PATCH',
+      body: JSON.stringify({ orderNo: reserved.orderNo, status: 'failed' }),
+    }),
+    actor: {},
+  } as any);
+  assert.notEqual((await manualClose.json()).code, 0);
+  const paid = (amount: number, currency = 'usd') => ({
+    paymentStatus: PaymentStatus.SUCCESS,
+    paymentInfo: { paymentAmount: amount, paymentCurrency: currency },
+    paymentResult: { id: reserved.paymentSessionId },
+  });
+  await assert.rejects(
+    settleCheckoutOrder(reserved, paid(10), 'stripe'),
+    /does not match/
+  );
+  await assert.rejects(
+    settleCheckoutOrder(reserved, paid(999, 'eur'), 'stripe'),
+    /does not match/
+  );
+  await settleCheckoutOrder(reserved, paid(999), 'stripe');
+  await settleCheckoutOrder(reserved, paid(999), 'stripe');
+  assert.deepEqual(await getVideoPurchaseStatus(userId), {
+    canGenerate: true,
+    firstPurchaseEligible: false,
+  });
+  const grants = await db()
+    .select({ credits: schema.credit.credits })
+    .from(schema.credit)
+    .where(eq(schema.credit.userId, userId));
+  assert.deepEqual(grants, [{ credits: 12450 }]);
+  await assert.rejects(
+    createFirstVideoCheckout(request),
+    FirstVideoPackUnavailableError
+  );
 });
 
 test('a CNY notification whose amount differs from the order is refused and grants nothing', async () => {

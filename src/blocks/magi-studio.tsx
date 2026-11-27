@@ -41,6 +41,7 @@ import {
 import { apiGet, apiGetBlob, apiPostForm } from '@/lib/api-client';
 import { m } from '@/paraglide/messages.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
+import { useVideoPurchase } from '@/hooks/use-video-purchase';
 import { MagiVideoPreview } from '@/components/magi-video-preview';
 
 import { MagiLink } from './magi-site';
@@ -119,6 +120,8 @@ export function MagiStudio({
   const router = useRouter();
   const pathname = usePathname();
   const { data: session, isPending: sessionPending } = useSession();
+  const purchase = useVideoPurchase(session?.user?.id);
+  const purchaseRequired = purchase.data?.canGenerate === false;
   const { data: publicConfig } = usePublicConfig();
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState({
@@ -274,6 +277,21 @@ export function MagiStudio({
     promptInput.current?.focus();
   }
 
+  function saveDraft() {
+    try {
+      window.sessionStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          prompt,
+          settings,
+          hadStartingImage: settings.mode === 'image-to-video' && !!image,
+        })
+      );
+    } catch {
+      // Navigation still works if browser storage is unavailable.
+    }
+  }
+
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (generate.isPending || working) return;
@@ -287,21 +305,15 @@ export function MagiStudio({
       return;
     }
     if (!session?.user) {
-      try {
-        window.sessionStorage.setItem(
-          draftKey,
-          JSON.stringify({
-            prompt,
-            settings,
-            hadStartingImage: settings.mode === 'image-to-video' && !!image,
-          })
-        );
-      } catch {
-        // Signing in still works if browser storage is unavailable.
-      }
+      saveDraft();
       router.push(
         `/sign-in?callbackUrl=${encodeURIComponent(`${pathname}?restore=true#studio`)}`
       );
+      return;
+    }
+    if (purchaseRequired) {
+      saveDraft();
+      router.push('/pricing');
       return;
     }
     if (!prompt.trim()) {
@@ -502,7 +514,11 @@ export function MagiStudio({
           type="submit"
           className="magi-button magi-button-primary magi-generate"
           disabled={
-            generate.isPending || working || sessionPending || generationOffline
+            generate.isPending ||
+            working ||
+            sessionPending ||
+            generationOffline ||
+            (!!session?.user && purchase.isPending)
           }
         >
           {generate.isPending || working ? (
@@ -516,10 +532,12 @@ export function MagiStudio({
               ? m['video.history.status.processing']()
               : !sessionPending && !session?.user && !generationOffline
                 ? m['video.studio.sign_in_to_generate']()
-                : job?.status === 'success'
-                  ? m['video.studio.again']()
-                  : m['video.studio.generate']()}
-          {!working && !generate.isPending && (
+                : purchaseRequired
+                  ? m['video.studio.buy_to_generate']()
+                  : job?.status === 'success'
+                    ? m['video.studio.again']()
+                    : m['video.studio.generate']()}
+          {!working && !generate.isPending && !purchaseRequired && (
             <span>
               {m['video.studio.credit']({
                 count: creditNumber.format(
@@ -532,14 +550,20 @@ export function MagiStudio({
         {error && (
           <p className="magi-error" role="alert">
             {error}{' '}
-            {generate.error &&
-              'code' in generate.error &&
-              generate.error.code === -1 &&
-              error === m['video.error.credits']() && (
-                <Link href="/pricing">{m['video.nav.pricing']()}</Link>
-              )}
+            {(error === m['video.error.credits']() ||
+              error === m['video.error.purchase_required']()) && (
+              <Link href="/pricing" onClick={saveDraft}>
+                {m['video.nav.pricing']()}
+              </Link>
+            )}
           </p>
         )}
+        {!generationOffline &&
+          !working &&
+          !error &&
+          (!session?.user || purchaseRequired) && (
+            <p className="magi-note">{m['video.studio.payment_required']()}</p>
+          )}
         {generationOffline && !error && (
           <p className="magi-note" role="status">
             {settings.mode === 'image-to-video'
@@ -636,10 +660,7 @@ export function MagiStudio({
                 {inputImage ? (
                   m['video.studio.ready_image']()
                 ) : (
-                  <a
-                    className="magi-text-link"
-                    href="#magi-sources"
-                  >
+                  <a className="magi-text-link" href="#magi-sources">
                     {reference.publisher === 'sand'
                       ? m['video.gallery.official']()
                       : reference.publisher === 'higgsfield'

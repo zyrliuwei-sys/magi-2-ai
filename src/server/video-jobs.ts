@@ -31,6 +31,7 @@ import {
 } from '@/modules/ai-tasks/service';
 import { getAllConfigs, type ConfigMap } from '@/modules/config/service';
 import { getBalance } from '@/modules/credits/service';
+import { getVideoPurchaseStatus } from '@/modules/payment/service';
 import { getStorage } from '@/modules/storage/service';
 
 export const videoRequestSchema = z.object({
@@ -75,6 +76,8 @@ export class VideoUnavailableError extends Error {
     super('Video generation is unavailable');
   }
 }
+
+export class VideoPurchaseRequiredError extends Error {}
 
 function ownsTask(
   task: VideoTask | undefined,
@@ -162,6 +165,9 @@ export async function startVideoJob(
   const { id, prompt, ...settings } = input;
   const found = await findTask(id);
   if (found) return ownsTask(found, userId) ? toVideoJob(found) : undefined;
+
+  if (!(await getVideoPurchaseStatus(userId)).canGenerate)
+    throw new VideoPurchaseRequiredError();
 
   const configs = await getAllConfigs();
   const client = createSeeApiVideoClient(configs);

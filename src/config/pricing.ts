@@ -46,6 +46,14 @@ export type PricingProduct = {
   maxLinks?: number;
 };
 
+export const firstVideoPack = {
+  productId: 'video_first_purchase',
+  label: 'First Video Pack',
+  priceInCents: 999,
+  currency: 'usd',
+  credits: videoCreditCost(5, '480p') + videoCreditCost(5, '1080p'),
+} as const;
+
 export const videoPlans = {
   oneTime: [
     {
@@ -121,6 +129,13 @@ const videoProducts = [
 ] satisfies PricingProduct[];
 
 export const pricingCatalog: Record<string, PricingProduct> = {
+  [firstVideoPack.productId]: {
+    ...firstVideoPack,
+    productName: firstVideoPack.label,
+    planName: firstVideoPack.label,
+    description: firstVideoPack.label,
+    type: PaymentType.ONE_TIME,
+  },
   ...Object.fromEntries(
     videoProducts.map((product) => [product.productId, product])
   ),

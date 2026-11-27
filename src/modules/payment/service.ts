@@ -1,4 +1,16 @@
-import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  notExists,
+  or,
+  sql,
+} from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { atomic, AtomicGuardError, guard } from '@/core/db/atomic';
@@ -18,7 +30,8 @@ import {
   type PaymentOrder,
   type PaymentRefund,
 } from '@/core/payment/types';
-import { credit, order, subscription } from '@/config/db/schema';
+import { credit, order, subscription, user } from '@/config/db/schema';
+import { firstVideoPack } from '@/config/pricing';
 import { getAllConfigs } from '@/modules/config/service';
 import {
   calculateCreditExpirationTime,
@@ -144,6 +157,227 @@ async function getPaymentManager(): Promise<PaymentManager> {
 }
 
 // --- Checkout ---
+
+function paidCreditOrders(userId: string) {
+  return and(
+    eq(order.userId, userId),
+    gt(order.creditsAmount, 0),
+    gt(order.paymentAmount, 0)
+  );
+}
+
+const pastPaidCreditStatuses = [
+  OrderStatus.PAID,
+  OrderStatus.REFUNDING,
+  OrderStatus.REFUNDED,
+];
+
+export async function getVideoPurchaseStatus(userId: string) {
+  const [payment] = await db()
+    .select({ status: order.status })
+    .from(order)
+    .where(
+      and(
+        paidCreditOrders(userId),
+        inArray(order.status, pastPaidCreditStatuses)
+      )
+    )
+    .orderBy(
+      sql`case when ${order.status} = ${OrderStatus.PAID} then 0 else 1 end`
+    )
+    .limit(1);
+  return {
+    canGenerate: payment?.status === OrderStatus.PAID,
+    firstPurchaseEligible: !payment,
+  };
+}
+
+export class FirstVideoPackUnavailableError extends Error {}
+
+const firstVideoCheckoutLifetime = 2 * 60 * 60 * 1000;
+const unpaidStatuses = [OrderStatus.PENDING, OrderStatus.CREATED];
+
+function openFirstVideoOrder(userId: string) {
+  return and(
+    eq(order.userId, userId),
+    eq(order.productId, firstVideoPack.productId),
+    inArray(order.status, unpaidStatuses)
+  );
+}
+
+async function reserveFirstVideoOrder(params: {
+  userId: string;
+  userEmail: string;
+  appUrl: string;
+}) {
+  const { userId, userEmail, appUrl } = params;
+  const [{ attempts }] = await db()
+    .select({ attempts: count() })
+    .from(order)
+    .where(
+      and(
+        eq(order.userId, userId),
+        eq(order.productId, firstVideoPack.productId)
+      )
+    );
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`${userId}:${attempts}`)
+  );
+  // The unique order number is a second claim for concurrent DB transactions.
+  const orderNo = `FIRST-${Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0')
+  ).join('')}`;
+  const callback = new URL('/api/payment/callback', appUrl);
+  callback.searchParams.set('order_no', orderNo);
+  callback.searchParams.set('redirect', '/?restore=true#studio');
+  try {
+    await atomic((q) => {
+      const blocked = q
+        .select({ id: order.id })
+        .from(order)
+        .where(
+          or(
+            openFirstVideoOrder(userId),
+            and(
+              paidCreditOrders(userId),
+              inArray(order.status, pastPaidCreditStatuses)
+            )
+          )
+        );
+      return [
+        guard({
+          table: user,
+          column: 'email',
+          where: eq(user.id, userId),
+          require: notExists(blocked),
+          message: 'First video pack is already reserved or purchased',
+        }),
+        q.insert(order).values({
+          id: getUuid(),
+          orderNo,
+          userId,
+          userEmail,
+          status: OrderStatus.PENDING,
+          amount: firstVideoPack.priceInCents,
+          currency: firstVideoPack.currency,
+          productId: firstVideoPack.productId,
+          productName: firstVideoPack.label,
+          planName: firstVideoPack.label,
+          description: firstVideoPack.label,
+          paymentType: PaymentType.ONE_TIME,
+          paymentProvider: 'stripe',
+          checkoutInfo: '{}',
+          callbackUrl: callback.toString(),
+          creditsAmount: firstVideoPack.credits,
+        }),
+      ];
+    });
+  } catch (error) {
+    if (error instanceof AtomicGuardError) return;
+    const [concurrent] = await db()
+      .select({ id: order.id })
+      .from(order)
+      .where(eq(order.orderNo, orderNo))
+      .limit(1);
+    if (!concurrent) throw error;
+  }
+}
+
+export async function createFirstVideoCheckout(params: {
+  userId: string;
+  userEmail: string;
+  appUrl: string;
+}): Promise<string> {
+  const provider = (await getPaymentManager()).getProvider('stripe');
+  if (!(provider instanceof StripeProvider))
+    throw new FirstVideoPackUnavailableError();
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const status = await getVideoPurchaseStatus(params.userId);
+    if (!status.firstPurchaseEligible)
+      throw new FirstVideoPackUnavailableError();
+
+    const [saved] = await db()
+      .select()
+      .from(order)
+      .where(openFirstVideoOrder(params.userId))
+      .limit(1);
+    if (!saved) {
+      await reserveFirstVideoOrder(params);
+      continue;
+    }
+
+    if (saved.paymentSessionId) {
+      const session = await provider.getPaymentSession({
+        sessionId: saved.paymentSessionId,
+      });
+      if (session.paymentStatus === PaymentStatus.PROCESSING) {
+        if (session.paymentResult?.status === 'open' && saved.checkoutUrl)
+          return saved.checkoutUrl;
+        throw new FirstVideoPackUnavailableError();
+      }
+      await settleCheckoutOrder(saved, session, provider.name);
+      if (session.paymentStatus === PaymentStatus.SUCCESS)
+        throw new FirstVideoPackUnavailableError();
+      continue;
+    }
+
+    const expiresAt = Math.floor(
+      (saved.createdAt.getTime() + firstVideoCheckoutLifetime) / 1000
+    );
+    const unbound = and(
+      eq(order.id, saved.id),
+      eq(order.status, OrderStatus.PENDING),
+      isNull(order.paymentSessionId)
+    );
+    if (Date.now() >= expiresAt * 1000) {
+      // The URL was never exposed and this reservation can no longer pay.
+      await db()
+        .update(order)
+        .set({ status: OrderStatus.FAILED })
+        .where(unbound);
+      continue;
+    }
+
+    const callback = saved.callbackUrl;
+    if (!callback) throw new FirstVideoPackUnavailableError();
+    const { checkoutInfo, checkoutResult } = await provider.createPayment({
+      reservation: { key: saved.id, expiresAt },
+      order: {
+        type: PaymentType.ONE_TIME,
+        price: { amount: saved.amount, currency: saved.currency },
+        customer: { email: saved.userEmail || undefined },
+        description: firstVideoPack.label,
+        successUrl: callback,
+        cancelUrl: new URL('/pricing', callback).toString(),
+      },
+    });
+    await db()
+      .update(order)
+      .set({
+        status: OrderStatus.CREATED,
+        paymentSessionId: checkoutInfo.sessionId,
+        checkoutInfo: JSON.stringify(checkoutInfo),
+        checkoutResult: JSON.stringify(checkoutResult),
+        checkoutUrl: checkoutInfo.checkoutUrl,
+      })
+      .where(unbound);
+    const [bound] = await db()
+      .select({ url: order.checkoutUrl })
+      .from(order)
+      .where(
+        and(
+          eq(order.id, saved.id),
+          eq(order.status, OrderStatus.CREATED),
+          eq(order.paymentSessionId, checkoutInfo.sessionId)
+        )
+      )
+      .limit(1);
+    if (bound?.url) return bound.url;
+  }
+  throw new FirstVideoPackUnavailableError();
+}
 
 export async function createCheckout(params: {
   userId: string;
@@ -347,6 +581,15 @@ export async function settleCheckoutOrder(
   const subscriptionInfo = session.subscriptionInfo;
 
   if (session.paymentStatus === PaymentStatus.SUCCESS) {
+    if (
+      existingOrder.productId === firstVideoPack.productId &&
+      (provider !== 'stripe' ||
+        paymentInfo?.paymentAmount !== existingOrder.amount ||
+        paymentInfo?.paymentCurrency?.toLowerCase() !== existingOrder.currency)
+    ) {
+      throw new Error('First video pack payment does not match the order');
+    }
+
     // CNY providers charge exactly the order amount (no coupons or tax on
     // their side), so any mismatch means the notification belongs to some
     // other trade — refuse to settle rather than grant on the wrong payment.
