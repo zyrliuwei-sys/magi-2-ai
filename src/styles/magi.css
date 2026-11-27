@@ -908,6 +908,44 @@
   border-color: color-mix(in oklab, var(--magi-brass) 55%, var(--magi-line));
 }
 
+.magi-pricing-inclusions {
+  margin-top: 29px;
+  border-top: 1px solid var(--magi-line);
+  padding-top: 22px;
+}
+.magi-pricing-inclusions h2 {
+  margin-bottom: 16px;
+  font-family: var(--brand-display);
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  line-height: 1.1;
+}
+.magi-pricing-inclusions dl > div {
+  min-width: 0;
+  border: 1px solid var(--magi-line);
+  border-radius: 13px;
+  background: var(--magi-panel);
+  padding: 16px;
+}
+.magi-pricing-inclusions dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.magi-pricing-inclusions dt svg {
+  flex-shrink: 0;
+  color: var(--magi-brass);
+}
+.magi-pricing-inclusions dd {
+  margin-top: 7px;
+  color: var(--magi-muted);
+  font-size: 0.87rem;
+  line-height: 1.55;
+}
+.magi-pricing-inclusions > .magi-text-link {
+  margin-top: 15px;
+}
+
 .magi-faq {
   display: grid;
   grid-template-columns: minmax(210px, 0.83fr) minmax(0, 1.5fr);

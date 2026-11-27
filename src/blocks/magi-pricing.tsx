@@ -1,20 +1,40 @@
 import { useMutation } from '@tanstack/react-query';
-import { ArrowUpRight, Check } from 'lucide-react';
+import {
+  ArrowUpRight,
+  AudioLines,
+  Check,
+  Download,
+  ImagePlus,
+  Proportions,
+  SlidersHorizontal,
+  Type,
+} from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
-import { MAGI_VIDEO_CREDITS } from '@/config/magi-video';
 import { firstVideoPack, videoPacks } from '@/config/pricing';
 import { apiPost } from '@/lib/api-client';
 import { m } from '@/paraglide/messages.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
 import { useVideoPurchase } from '@/hooks/use-video-purchase';
 
-const creditNumber = new Intl.NumberFormat('en-US');
+import { MagiLink } from './magi-site';
+
 const usd = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
 });
+
+const includedFeatures = [
+  ['text', Type],
+  ['image', ImagePlus],
+  ['sound', AudioLines],
+  ['framing', Proportions],
+  ['seed', SlidersHorizontal],
+  ['export', Download],
+] as const;
 
 export function MagiPricing({ embedded = false }: { embedded?: boolean }) {
   const { data: config, isError: configError } = usePublicConfig();
@@ -75,9 +95,9 @@ export function MagiPricing({ embedded = false }: { embedded?: boolean }) {
             <div className="magi-plan-allowance">
               <p>
                 <Check size={16} aria-hidden="true" />{' '}
-                {m['video.studio.credit']({
-                  count: creditNumber.format(pack.credits),
-                })}
+                {pack.clips === 1
+                  ? m['video.pricing.allowance.one']()
+                  : m['video.pricing.allowance.many']({ count: pack.clips })}
               </p>
               {pack.tier === 'first' && (
                 <p>{m['video.pricing.first_pack_terms']()}</p>
@@ -89,16 +109,12 @@ export function MagiPricing({ embedded = false }: { embedded?: boolean }) {
               type="button"
               onClick={() => buy(pack.productId)}
             >
-              {m['video.pricing.buy']()} <ArrowUpRight size={15} />
+              {m['video.pricing.buy_pack']()} <ArrowUpRight size={15} />
             </button>
           </article>
         ))}
       </div>
-      <p className="magi-note">
-        {m['video.pricing.rule']({
-          count: creditNumber.format(MAGI_VIDEO_CREDITS),
-        })}
-      </p>
+      <p className="magi-note">{m['video.pricing.render_policy']()}</p>
       {(config || configError) && !stripeEnabled && (
         <p className="magi-note magi-library-note">
           {m['video.pricing.offline']()}
@@ -114,6 +130,26 @@ export function MagiPricing({ embedded = false }: { embedded?: boolean }) {
             : m['video.pricing.failed']()}
         </p>
       )}
+      <section
+        className="magi-pricing-inclusions"
+        aria-labelledby="pricing-inclusions-title"
+      >
+        <h2 id="pricing-inclusions-title">
+          {m['video.pricing.inclusions.title']()}
+        </h2>
+        <dl className="magi-price-grid">
+          {includedFeatures.map(([feature, Icon]) => (
+            <div key={feature}>
+              <dt>
+                <Icon size={18} aria-hidden="true" />
+                {m[`video.pricing.inclusions.${feature}.title`]()}
+              </dt>
+              <dd>{m[`video.pricing.inclusions.${feature}.text`]()}</dd>
+            </div>
+          ))}
+        </dl>
+        <MagiLink href="/#studio">{m['video.brand.cta']()}</MagiLink>
+      </section>
     </section>
   );
 }

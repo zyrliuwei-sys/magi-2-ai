@@ -131,7 +131,6 @@ const related = {
   image: '/guide#product',
   examples: '/prompts',
   prompts: '/guide',
-  pricing: '/#studio',
 } as const;
 
 export function MagiInsight({ page }: { page: keyof typeof related }) {
