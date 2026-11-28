@@ -16,6 +16,7 @@ import {
 import { localizedPath } from '@/lib/locale-path';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
+import { studioDraftUrl } from '@/lib/video-draft';
 import { m } from '@/paraglide/messages.js';
 
 function safeSameOriginPath(
@@ -111,11 +112,9 @@ async function POST({ request }: { request: Request }) {
 
     // Build success/cancel URLs — only accept same-origin redirects.
     const baseUrl = configs.app_url || 'http://localhost:3000';
-    const safeRedirectPath = safeSameOriginPath(
-      redirect,
-      '/settings/payments',
-      baseUrl
-    );
+    const safeRedirectPath = isVideoPack
+      ? studioDraftUrl()
+      : safeSameOriginPath(redirect, '/settings/payments', baseUrl);
     // Straight to the destination: safeSameOriginPath has already reduced it
     // to a path on this site. The old detour through /auth-callback exists to
     // hand a session token to a desktop client — a browser coming back from

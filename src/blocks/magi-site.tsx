@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
 import { ArrowRight, ArrowUpRight, Menu } from 'lucide-react';
 
@@ -6,6 +6,7 @@ import { useSession } from '@/core/auth/client';
 import { Link, usePathname } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { openCookieSettings } from '@/lib/cookie-consent';
+import { flushVideoPaywall } from '@/lib/track';
 import { m } from '@/paraglide/messages.js';
 import { useUserPermissions } from '@/hooks/use-user-permissions';
 import { FooterBadgeList } from '@/components/footer-badge-list';
@@ -27,6 +28,9 @@ export function MagiHeader() {
   const menu = useRef<HTMLDetailsElement>(null);
   const { data: session } = useSession();
   const { data: permissions } = useUserPermissions();
+  useEffect(() => {
+    if (session?.user.id) flushVideoPaywall();
+  }, [session?.user.id]);
   const closeMenu = () => {
     if (menu.current) menu.current.open = false;
   };

@@ -1,4 +1,14 @@
-import { and, asc, desc, eq, gte, isNotNull, lte, ne } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lte,
+  ne,
+} from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import {
@@ -33,6 +43,7 @@ export type BuiltinTimelineKind =
   | 'order_created'
   | 'order_paid'
   | 'order_failed'
+  | 'order_expired'
   | 'order_refunded'
   | 'subscription_started'
   | 'subscription_canceled'
@@ -81,6 +92,7 @@ const KIND_RANK: Record<string, number> = {
   task_succeeded: 7,
   task_failed: 7,
   order_failed: 8,
+  order_expired: 8,
   order_refunded: 8,
   subscription_canceled: 9,
   ticket_opened: 10,
@@ -184,12 +196,13 @@ export async function GET({ request }: AdminHandlerContext) {
           orderNo: order.orderNo,
           at: order.updatedAt,
           product: order.productName,
+          status: order.status,
         })
         .from(order)
         .where(
           and(
             eq(order.userId, userId),
-            eq(order.status, 'failed'),
+            inArray(order.status, ['failed', 'expired']),
             from(order.updatedAt)
           )
         )
@@ -383,7 +396,7 @@ export async function GET({ request }: AdminHandlerContext) {
       );
     for (const o of ordersFailed)
       push(
-        'order_failed',
+        o.status === 'expired' ? 'order_expired' : 'order_failed',
         o.id,
         o.at,
         { orderNo: o.orderNo, product: o.product || null },

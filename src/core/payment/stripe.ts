@@ -286,7 +286,10 @@ export class StripeProvider implements PaymentProvider {
 
       const eventType = this.mapStripeEventType(event.type);
 
-      if (eventType === PaymentEventType.CHECKOUT_SUCCESS) {
+      if (
+        eventType === PaymentEventType.CHECKOUT_SUCCESS ||
+        eventType === PaymentEventType.CHECKOUT_EXPIRED
+      ) {
         paymentSession = await this.buildPaymentSessionFromCheckoutSession(
           event.data.object as Stripe.Response<Stripe.Checkout.Session>
         );
@@ -480,6 +483,8 @@ export class StripeProvider implements PaymentProvider {
     switch (eventType) {
       case 'checkout.session.completed':
         return PaymentEventType.CHECKOUT_SUCCESS;
+      case 'checkout.session.expired':
+        return PaymentEventType.CHECKOUT_EXPIRED;
       case 'invoice.payment_succeeded':
         return PaymentEventType.PAYMENT_SUCCESS;
       case 'invoice.payment_failed':

@@ -242,6 +242,20 @@ test('real payment metrics, refunds, unique cohorts, staff exclusion and daily b
         source: 'client',
         createdAt: signupAt,
       },
+      {
+        id: 'paywall1',
+        userId: 'buyer',
+        kind: 'paywall_hit',
+        source: 'client',
+        createdAt: signupAt,
+      },
+      {
+        id: 'redirect1',
+        userId: 'buyer',
+        kind: 'checkout_redirected',
+        source: 'client',
+        createdAt: signupAt,
+      },
     ]);
   const report = await operations.getOperationsReport({ now });
   assert.equal(report.today.orders, 3);
@@ -266,6 +280,8 @@ test('real payment metrics, refunds, unique cohorts, staff exclusion and daily b
     'staff, API, tests and a second browser are excluded'
   );
   assert.equal(report.totals.signups, 1);
+  assert.equal(report.totals.paywalls, 1);
+  assert.equal(report.totals.redirected, 1);
   assert.equal(
     report.totals.selected,
     1,

@@ -197,6 +197,7 @@ export interface PaymentSession {
 
 export enum PaymentEventType {
   CHECKOUT_SUCCESS = 'checkout.success', // checkout success
+  CHECKOUT_EXPIRED = 'checkout.expired',
   PAYMENT_SUCCESS = 'payment.success', // payment success
   PAYMENT_FAILED = 'payment.failed', // payment failed
   PAYMENT_REFUNDED = 'payment.refunded', // payment refunded

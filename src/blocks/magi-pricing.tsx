@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
   ArrowUpRight,
@@ -12,20 +13,22 @@ import {
 
 import { useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
-import { firstVideoPack, videoPacks } from '@/config/pricing';
+import {
+  firstVideoPack,
+  formatVideoPackPrice,
+  videoPacks,
+} from '@/config/pricing';
 import { apiPost } from '@/lib/api-client';
+import { track } from '@/lib/track';
+import { readVideoDraft, studioDraftUrl } from '@/lib/video-draft';
 import { m } from '@/paraglide/messages.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
 import { useVideoPurchase } from '@/hooks/use-video-purchase';
 
 import { MagiLink } from './magi-site';
 
-const usd = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
+const checkoutIntentKey = 'magi-checkout-intent';
+const intentLifetimeMs = 30 * 60 * 1000;
 
 const includedFeatures = [
   ['text', Type],
@@ -36,10 +39,19 @@ const includedFeatures = [
   ['export', Download],
 ] as const;
 
-export function MagiPricing({ embedded = false }: { embedded?: boolean }) {
+export function MagiPricing({
+  embedded = false,
+  selectedPack,
+  resume,
+}: {
+  embedded?: boolean;
+  selectedPack?: string;
+  resume?: string;
+}) {
   const { data: config, isError: configError } = usePublicConfig();
   const PlanTitle = embedded ? 'h3' : 'h2';
-  const { data: session } = useSession();
+  const { data: session, isPending: sessionPending } = useSession();
+  const [draftUrl, setDraftUrl] = useState<string>();
   const purchase = useVideoPurchase(session?.user?.id);
   const router = useRouter();
   const stripeEnabled = config?.stripe_enabled === 'true';
@@ -52,22 +64,82 @@ export function MagiPricing({ embedded = false }: { embedded?: boolean }) {
       apiPost<{ checkout_url?: string }>('/api/payment/checkout', {
         product_id: id,
         payment_provider: 'stripe',
-        redirect: '/settings/videos',
         locale: 'en',
       }),
-    onSuccess: ({ checkout_url }) => {
-      if (checkout_url && /^https?:\/\//.test(checkout_url))
+    onSuccess: ({ checkout_url }, id) => {
+      if (checkout_url?.startsWith('https://')) {
+        track('checkout_redirected', { productId: id });
         window.location.assign(checkout_url);
+      }
     },
   });
+  const { mutate: openCheckout } = checkout;
 
-  function buy(id: string) {
-    if (!stripeEnabled) return;
-    if (!session?.user) {
-      router.push('/sign-in?callbackUrl=%2Fpricing');
+  useEffect(() => {
+    if (embedded) return;
+    const draft = readVideoDraft();
+    if (draft) setDraftUrl(studioDraftUrl(draft.path));
+  }, [embedded]);
+
+  useEffect(() => {
+    if (
+      !session?.user ||
+      !stripeEnabled ||
+      !selectedPack ||
+      !resume ||
+      (selectedPack === firstVideoPack.productId && purchase.isPending) ||
+      (selectedPack === firstVideoPack.productId &&
+        purchase.data?.firstPurchaseEligible === false)
+    )
+      return;
+    try {
+      const saved = JSON.parse(
+        sessionStorage.getItem(checkoutIntentKey) || 'null'
+      );
+      if (
+        saved?.id !== selectedPack ||
+        saved.token !== resume ||
+        typeof saved.at !== 'number' ||
+        Date.now() - saved.at > intentLifetimeMs
+      )
+        return;
+      sessionStorage.removeItem(checkoutIntentKey);
+    } catch {
       return;
     }
-    checkout.mutate(id);
+    track('plan_selected', { productId: selectedPack });
+    openCheckout(selectedPack);
+  }, [
+    session?.user.id,
+    stripeEnabled,
+    selectedPack,
+    resume,
+    purchase.isPending,
+    purchase.data?.firstPurchaseEligible,
+    openCheckout,
+  ]);
+
+  function buy(id: string) {
+    if (!stripeEnabled || sessionPending || checkout.isPending) return;
+    if (!session?.user) {
+      const search = new URLSearchParams({ pack: id });
+      try {
+        const token = crypto.randomUUID();
+        sessionStorage.setItem(
+          checkoutIntentKey,
+          JSON.stringify({ id, token, at: Date.now() })
+        );
+        search.set('resume', token);
+      } catch {
+        // The pricing page can still highlight the selected pack after sign-in.
+      }
+      router.push(
+        `/sign-in?callbackUrl=${encodeURIComponent(`/pricing?${search}`)}`
+      );
+      return;
+    }
+    track('plan_selected', { productId: id });
+    openCheckout(id);
   }
 
   return (
@@ -86,10 +158,14 @@ export function MagiPricing({ embedded = false }: { embedded?: boolean }) {
       )}
       <div className="magi-price-grid" aria-live="polite">
         {packs.map((pack) => (
-          <article className="magi-price-card" key={pack.productId}>
+          <article
+            className="magi-price-card"
+            key={pack.productId}
+            data-selected={selectedPack === pack.productId || undefined}
+          >
             <PlanTitle>{m[`video.pricing.pack.${pack.tier}`]()}</PlanTitle>
             <div className="magi-plan-price">
-              <strong>{usd.format(pack.priceInCents / 100)}</strong>
+              <strong>{formatVideoPackPrice(pack.priceInCents)}</strong>
               <span>{m['video.pricing.once']()}</span>
             </div>
             <div className="magi-plan-allowance">
@@ -105,23 +181,40 @@ export function MagiPricing({ embedded = false }: { embedded?: boolean }) {
             </div>
             <button
               className="magi-button magi-button-primary"
-              disabled={!stripeEnabled || checkout.isPending}
+              disabled={!stripeEnabled || sessionPending || checkout.isPending}
               type="button"
               onClick={() => buy(pack.productId)}
             >
-              {m['video.pricing.buy_pack']()} <ArrowUpRight size={15} />
+              {checkout.isPending && checkout.variables === pack.productId
+                ? m['video.pricing.opening_checkout']()
+                : selectedPack === pack.productId
+                  ? m['video.pricing.continue_checkout']()
+                  : m['video.pricing.buy_pack']()}{' '}
+              <ArrowUpRight size={15} />
             </button>
           </article>
         ))}
       </div>
       <p className="magi-note">{m['video.pricing.render_policy']()}</p>
+      {draftUrl && (
+        <MagiLink href={draftUrl}>
+          {m['video.pricing.back_to_draft']()}
+        </MagiLink>
+      )}
+      {selectedPack === firstVideoPack.productId &&
+        purchase.data?.firstPurchaseEligible === false && (
+          <p className="magi-note" role="status">
+            {m['video.pricing.first_pack_unavailable']()}
+          </p>
+        )}
       {(config || configError) && !stripeEnabled && (
         <p className="magi-note magi-library-note">
           {m['video.pricing.offline']()}
         </p>
       )}
       {(checkout.isError ||
-        (checkout.isSuccess && !checkout.data.checkout_url)) && (
+        (checkout.isSuccess &&
+          !checkout.data.checkout_url?.startsWith('https://'))) && (
         <p role="alert" className="magi-error">
           {checkout.variables === firstVideoPack.productId &&
           checkout.error?.message ===

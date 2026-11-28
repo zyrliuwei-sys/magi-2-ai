@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { eq } from 'drizzle-orm';
+import Stripe from 'stripe';
 
 // Isolated SQLite DB; no application modules load before the env is set.
 const directory = await mkdtemp(join(tmpdir(), 'shipany-guards-test-'));
@@ -37,7 +38,8 @@ const {
   settleCheckoutOrder,
 } = await import('../src/modules/payment/service');
 const { StripeProvider } = await import('../src/core/payment/stripe');
-const { PaymentStatus } = await import('../src/core/payment/types');
+const { PaymentEventType, PaymentStatus } =
+  await import('../src/core/payment/types');
 const { startVideoJob, VideoPurchaseRequiredError } =
   await import('../src/server/video-jobs');
 const { assertEndpointSecretsResupplied } =
@@ -82,6 +84,70 @@ const success = (orderNo: string, amount: number) => ({
   paymentStatus: 'paid',
   paymentInfo: { amount, transactionId: `T-${orderNo}` },
   paymentResult: { out_trade_no: orderNo },
+});
+
+test('a signed Stripe expiry closes only the matching unpaid order without credits', async () => {
+  const row = await createdOrder('session-expired-test', 'stripe', 990);
+  const secretKey = 'stripe-test-placeholder';
+  const signingSecret = 'stripe-signature-test-placeholder';
+  const stripe = new Stripe(secretKey);
+  const provider = new StripeProvider({
+    secretKey,
+    signingSecret,
+    publishableKey: '',
+  });
+  const payload = JSON.stringify({
+    type: 'checkout.session.expired',
+    data: {
+      object: {
+        id: row.paymentSessionId,
+        status: 'expired',
+        payment_status: 'unpaid',
+        amount_total: 990,
+        currency: 'cny',
+      },
+    },
+  });
+  const signature = stripe.webhooks.generateTestHeaderString({
+    payload,
+    secret: signingSecret,
+  });
+  const event = await provider.getPaymentEvent({
+    req: new Request('http://localhost/api/payment/notify/stripe', {
+      method: 'POST',
+      body: payload,
+      headers: { 'stripe-signature': signature },
+    }),
+  });
+  assert.equal(event.eventType, PaymentEventType.CHECKOUT_EXPIRED);
+  assert.equal(event.paymentSession?.paymentStatus, PaymentStatus.CANCELED);
+  await assert.rejects(
+    settleCheckoutOrder(
+      { ...row, currency: 'usd' },
+      event.paymentSession,
+      'stripe'
+    ),
+    /does not match the order/
+  );
+  await Promise.all([
+    settleCheckoutOrder(row, event.paymentSession, 'stripe'),
+    settleCheckoutOrder(row, event.paymentSession, 'stripe'),
+  ]);
+  const [after] = await db()
+    .select()
+    .from(schema.order)
+    .where(eq(schema.order.id, row.id));
+  assert.equal(after.status, 'expired');
+  assert.equal(after.paidAt, null);
+  assert.equal(
+    (
+      await db()
+        .select()
+        .from(schema.credit)
+        .where(eq(schema.credit.orderNo, row.orderNo))
+    ).length,
+    0
+  );
 });
 
 test('only three one-time USD video packs are purchasable', () => {
@@ -228,10 +294,22 @@ test('first pack checkout resumes one session, retries expiry and grants credits
       };
     }
   );
-  t.mock.method(StripeProvider.prototype, 'getPaymentSession', async () => ({
-    paymentStatus: expired ? PaymentStatus.CANCELED : PaymentStatus.PROCESSING,
-    paymentResult: { status: expired ? 'expired' : 'open' },
-  }));
+  t.mock.method(
+    StripeProvider.prototype,
+    'getPaymentSession',
+    async ({ sessionId }: { sessionId: string }) => ({
+      paymentStatus: expired
+        ? PaymentStatus.CANCELED
+        : PaymentStatus.PROCESSING,
+      paymentResult: {
+        id: sessionId,
+        status: expired ? 'expired' : 'open',
+        payment_status: 'unpaid',
+        amount_total: 990,
+        currency: 'usd',
+      },
+    })
+  );
   const request = { userId, userEmail, appUrl };
   await db().insert(schema.order).values({
     id: 'old-first-pack',
@@ -252,7 +330,16 @@ test('first pack checkout resumes one session, retries expiry and grants credits
     'expireCheckoutSession',
     async (id: string) => {
       assert.equal(id, 'old-session');
-      return { paymentStatus: PaymentStatus.CANCELED };
+      return {
+        paymentStatus: PaymentStatus.CANCELED,
+        paymentResult: {
+          id,
+          status: 'expired',
+          payment_status: 'unpaid',
+          amount_total: 990,
+          currency: 'cny',
+        },
+      };
     }
   );
   const current = await createFirstVideoCheckout(request);

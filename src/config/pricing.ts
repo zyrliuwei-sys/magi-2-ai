@@ -48,6 +48,17 @@ export type PricingProduct = {
 
 const legacyFirstVideoPackProductId = 'video_first_purchase';
 
+const videoPriceFormat = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+export function formatVideoPackPrice(priceInCents: number) {
+  return videoPriceFormat.format(priceInCents / 100);
+}
+
 export const firstVideoPack = {
   productId: 'video_first_purchase_usd',
   tier: 'first',

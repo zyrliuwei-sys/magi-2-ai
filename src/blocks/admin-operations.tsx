@@ -43,8 +43,10 @@ function exportReport(report: OperationsReport) {
       'visitors',
       'signups',
       'active',
+      'paywall_hit',
       'plan_selected',
       'checkouts',
+      'checkout_redirected',
       'paid',
       'visitor_signup_rate',
       'signup_paid_rate',
@@ -55,8 +57,10 @@ function exportReport(report: OperationsReport) {
       r.visitors,
       r.signups,
       r.active,
+      r.paywalls,
       r.selected,
       r.checkouts,
+      r.redirected,
       r.paid,
       rate(r.signups, r.visitors),
       rate(r.paid, r.signups),
@@ -132,8 +136,10 @@ export function AdminOperations() {
   const steps = [
     { key: 'visitors', label: m['admin.operations.visitors']() },
     { key: 'signups', label: m['admin.operations.signups']() },
+    { key: 'paywalls', label: m['admin.operations.paywalls']() },
     { key: 'selected', label: m['admin.operations.selected']() },
     { key: 'checkouts', label: m['admin.operations.checkouts']() },
+    { key: 'redirected', label: m['admin.operations.redirected']() },
     { key: 'paid', label: m['admin.operations.paid']() },
   ] as const;
   const totals = report?.totals;
@@ -386,7 +392,7 @@ export function AdminOperations() {
         {tab === 'funnel' && (
           <>
             <section
-              className="grid gap-3 sm:grid-cols-5"
+              className="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-7"
               aria-label={m['admin.operations.funnel']()}
             >
               {steps.map((step, i) => (

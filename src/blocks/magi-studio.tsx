@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
-import { Link, usePathname, useRouter } from '@/core/i18n/navigation';
+import { Link, useRouter } from '@/core/i18n/navigation';
 import {
   magiPrompts,
   magiStudioClips,
@@ -25,7 +25,6 @@ import {
   type MagiPromptId,
 } from '@/config/magi-content';
 import {
-  MAGI_VIDEO_CREDITS,
   MAGI_VIDEO_DURATION,
   MAGI_VIDEO_MAX_SEED,
   MAGI_VIDEO_RESOLUTION,
@@ -38,7 +37,17 @@ import {
   type VideoMode,
   type VideoSettings,
 } from '@/config/magi-video';
+import { firstVideoPack, formatVideoPackPrice } from '@/config/pricing';
 import { apiGet, apiGetBlob, apiPostForm } from '@/lib/api-client';
+import { trackVideoPaywall } from '@/lib/track';
+import {
+  clearVideoDraft,
+  readVideoDraft,
+  readVideoDraftFrames,
+  saveVideoDraft,
+  studioDraftUrl,
+  studioPath,
+} from '@/lib/video-draft';
 import { m } from '@/paraglide/messages.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
 import { useVideoPurchase } from '@/hooks/use-video-purchase';
@@ -46,7 +55,6 @@ import { MagiVideoPreview } from '@/components/magi-video-preview';
 
 import { MagiLink } from './magi-site';
 
-const draftKey = 'magi-video-draft';
 const creditNumber = new Intl.NumberFormat('en-US');
 const defaultSettings: VideoSettings = {
   mode: 'text-to-video',
@@ -178,7 +186,12 @@ export function MagiStudio({
   restore?: boolean;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname =
+    preview === 'image'
+      ? '/image-to-video'
+      : preview === 'text'
+        ? '/text-to-video'
+        : '/';
   const { data: session, isPending: sessionPending } = useSession();
   const purchase = useVideoPurchase(session?.user?.id);
   const purchaseRequired = purchase.data?.canGenerate === false;
@@ -203,34 +216,42 @@ export function MagiStudio({
   const [recentJob, setRecentJob] = useState<VideoJob>();
   const [referenceIndex, setReferenceIndex] = useState(0);
   const promptInput = useRef<HTMLTextAreaElement>(null);
+  const savingDraft = useRef(false);
   const requestId = useRef<string | undefined>(undefined);
   const restoredJobId = useRef<string | undefined>(undefined);
   const inputId = useId();
   const jobId = recentJob?.id ?? taskId;
 
   useEffect(() => {
-    if (!restore) return;
-    try {
-      const raw = window.sessionStorage.getItem(draftKey);
-      if (!raw) return;
-      window.sessionStorage.removeItem(draftKey);
-      const draft = JSON.parse(raw) as {
-        prompt: string;
-        settings: VideoSettings;
-        hadStartingImage?: boolean;
-      };
-      setPrompt(draft.prompt);
-      setSettings({
-        ...defaultSettings,
-        ...draft.settings,
-        duration: MAGI_VIDEO_DURATION,
-        resolution: MAGI_VIDEO_RESOLUTION,
-      });
-      setNeedsStartingImage(draft.hadStartingImage === true);
-    } catch {
-      // Old or cleared drafts can be ignored.
+    if (!restore || taskId) return;
+    const draft = readVideoDraft();
+    if (!draft) return;
+    const destination = studioPath(draft.path ?? pathname);
+    if (destination !== pathname) {
+      router.replace(studioDraftUrl(destination));
+      return;
     }
-  }, [restore]);
+    let canceled = false;
+    setPrompt(draft.prompt);
+    setSettings({
+      ...defaultSettings,
+      ...draft.settings,
+      duration: MAGI_VIDEO_DURATION,
+      resolution: MAGI_VIDEO_RESOLUTION,
+    });
+    void readVideoDraftFrames(draft.frameKey).then((frames) => {
+      if (canceled) return;
+      setImage((current) => current ?? frames.image);
+      setEndingImage((current) => current ?? frames.endingImage);
+      setNeedsStartingImage(
+        (draft.hadStartingImage === true && !frames.image) ||
+          (draft.hadEndingImage === true && !frames.endingImage)
+      );
+    });
+    return () => {
+      canceled = true;
+    };
+  }, [pathname, restore, taskId]);
 
   useEffect(() => {
     if (!image) {
@@ -301,6 +322,7 @@ export function MagiStudio({
   const generate = useMutation({
     mutationFn: (data: FormData) => apiPostForm<VideoJob>('/api/videos', data),
     onSuccess: (result) => {
+      clearVideoDraft();
       requestId.current = undefined;
       setRecentJob(result);
       queryClient.setQueryData(
@@ -347,19 +369,25 @@ export function MagiStudio({
     promptInput.current?.focus();
   }
 
-  function saveDraft() {
-    try {
-      window.sessionStorage.setItem(
-        draftKey,
-        JSON.stringify({
-          prompt,
-          settings,
-          hadStartingImage: settings.mode === 'image-to-video' && !!image,
-        })
-      );
-    } catch {
-      // Navigation still works if browser storage is unavailable.
-    }
+  async function leaveWithDraft(destination: string) {
+    if (savingDraft.current) return;
+    savingDraft.current = true;
+    const isImage = settings.mode === 'image-to-video';
+    await saveVideoDraft(
+      { prompt, settings, path: pathname },
+      isImage ? image : undefined,
+      isImage ? endingImage : undefined
+    );
+    savingDraft.current = false;
+    router.push(destination);
+  }
+
+  function openVideoPacks(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return;
+    event.preventDefault();
+    trackVideoPaywall(settings.mode, !!session?.user);
+    void leaveWithDraft('/pricing');
   }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -375,15 +403,15 @@ export function MagiStudio({
       return;
     }
     if (!session?.user) {
-      saveDraft();
-      router.push(
-        `/sign-in?callbackUrl=${encodeURIComponent(`${pathname}?restore=true#studio`)}`
+      trackVideoPaywall(settings.mode, false);
+      void leaveWithDraft(
+        `/sign-in?callbackUrl=${encodeURIComponent(studioDraftUrl(pathname))}`
       );
       return;
     }
     if (purchaseRequired) {
-      saveDraft();
-      router.push('/pricing');
+      trackVideoPaywall(settings.mode, true);
+      void leaveWithDraft('/pricing');
       return;
     }
     if (settings.mode === 'text-to-video' && !prompt.trim()) {
@@ -421,6 +449,18 @@ export function MagiStudio({
           </span>
           <h2>{m['video.studio.title']()}</h2>
         </div>
+        {!generationOffline && (!session?.user || purchaseRequired) && (
+          <p className="magi-note magi-studio-offer">
+            {purchase.data?.firstPurchaseEligible === false
+              ? m['video.studio.pack_offer']()
+              : m['video.studio.first_offer']({
+                  price: formatVideoPackPrice(firstVideoPack.priceInCents),
+                })}{' '}
+            <Link href="/pricing" onClick={openVideoPacks}>
+              {m['video.studio.view_packs']()}
+            </Link>
+          </p>
+        )}
         <div className="magi-modes" aria-label={m['video.studio.title']()}>
           <button
             type="button"
@@ -595,12 +635,8 @@ export function MagiStudio({
                   : job?.status === 'success'
                     ? m['video.studio.again']()
                     : m['video.studio.generate']()}
-          {!working && !generate.isPending && !purchaseRequired && (
-            <span>
-              {m['video.studio.credit']({
-                count: creditNumber.format(MAGI_VIDEO_CREDITS),
-              })}
-            </span>
+          {!working && !generate.isPending && purchase.data?.canGenerate && (
+            <span>{m['video.studio.one_video']()}</span>
           )}
         </button>
         {error && (
@@ -608,18 +644,12 @@ export function MagiStudio({
             {error}{' '}
             {(error === m['video.error.credits']() ||
               error === m['video.error.purchase_required']()) && (
-              <Link href="/pricing" onClick={saveDraft}>
+              <Link href="/pricing" onClick={openVideoPacks}>
                 {m['video.nav.pricing']()}
               </Link>
             )}
           </p>
         )}
-        {!generationOffline &&
-          !working &&
-          !error &&
-          (!session?.user || purchaseRequired) && (
-            <p className="magi-note">{m['video.studio.payment_required']()}</p>
-          )}
         {generationOffline && !error && (
           <p className="magi-note" role="status">
             {settings.mode === 'image-to-video'
@@ -630,15 +660,11 @@ export function MagiStudio({
         {!generationOffline &&
           !error &&
           settings.mode === 'image-to-video' &&
-          (!session?.user && image ? (
-            <p className="magi-note">
-              {m['video.studio.image_before_sign_in']()}
-            </p>
-          ) : needsStartingImage && !image ? (
+          needsStartingImage && (
             <p className="magi-note" role="status">
               {m['video.studio.image_after_sign_in']()}
             </p>
-          ) : null)}
+          )}
       </form>
       <div className="magi-preview">
         <div className="magi-preview-top">
@@ -768,6 +794,11 @@ export function parseStudioSearch(search: Record<string, unknown>): {
         ? search.task
         : undefined,
     restore:
-      search.restore === true || search.restore === '1' ? true : undefined,
+      search.restore === true ||
+      search.restore === 'true' ||
+      search.restore === 1 ||
+      search.restore === '1'
+        ? true
+        : undefined,
   };
 }

@@ -55,7 +55,7 @@ type Tab = (typeof TABS)[number];
 const PAGE_SIZE = 20;
 
 // Order statuses a buyer filters by (refunding is a brief in-between state).
-const FILTER_STATUSES = ['paid', 'created', 'refunded', 'failed'];
+const FILTER_STATUSES = ['paid', 'created', 'expired', 'refunded', 'failed'];
 const STATUS_LABELS = [
   'paid',
   'created',
@@ -63,6 +63,7 @@ const STATUS_LABELS = [
   'refunding',
   'refunded',
   'failed',
+  'expired',
 ];
 
 function statusLabel(status: string) {

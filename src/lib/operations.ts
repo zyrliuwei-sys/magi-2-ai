@@ -30,8 +30,10 @@ export interface OperationsCounts {
   visitors: number;
   signups: number;
   active: number;
+  paywalls: number;
   selected: number;
   checkouts: number;
+  redirected: number;
   paid: number;
   revenue: { currency: string; amount: number }[];
 }

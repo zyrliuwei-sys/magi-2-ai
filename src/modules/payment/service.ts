@@ -66,6 +66,7 @@ enum OrderStatus {
   CREATED = 'created',
   PAID = 'paid',
   FAILED = 'failed',
+  EXPIRED = 'expired',
   REFUNDING = 'refunding', // claimed by an in-flight refund
   REFUNDED = 'refunded',
 }
@@ -503,7 +504,7 @@ export async function handlePaymentCallback(orderNo: string) {
   // Reuse the same atomic success handler as the webhook so that
   // subscriptions are created and credits granted on synchronous return too.
   // This is important in environments where webhooks aren't reachable (e.g. localhost).
-  await handleCheckoutSuccess(session, existingOrder.paymentProvider);
+  await handleCheckoutSession(session, existingOrder.paymentProvider);
 }
 
 // --- Webhook handling ---
@@ -523,8 +524,8 @@ export async function handleWebhook(params: {
   const eventType = event.eventType;
 
   // Route event to appropriate handler
-  if (eventType === 'checkout.success') {
-    await handleCheckoutSuccess(session, params.provider);
+  if (eventType === 'checkout.success' || eventType === 'checkout.expired') {
+    await handleCheckoutSession(session, params.provider);
   } else if (eventType === 'payment.success') {
     if (
       session.paymentInfo?.subscriptionCycleType ===
@@ -532,7 +533,7 @@ export async function handleWebhook(params: {
     ) {
       await handleSubscriptionRenewal(session, params.provider);
     } else {
-      await handleCheckoutSuccess(session, params.provider);
+      await handleCheckoutSession(session, params.provider);
     }
   } else if (eventType === 'subscribe.updated') {
     await handleSubscriptionUpdated(session, params.provider);
@@ -543,9 +544,9 @@ export async function handleWebhook(params: {
   return event;
 }
 
-// --- Checkout Success: update order + create subscription + grant credits ---
+// --- Checkout settlement ---
 
-async function handleCheckoutSuccess(session: any, provider: string) {
+async function handleCheckoutSession(session: any, provider: string) {
   // Different providers expose the session identifier under different keys.
   // We try the common shapes; for Alipay the natural key is out_trade_no
   // (which equals our orderNo and the value we stored in paymentSessionId).
@@ -562,7 +563,13 @@ async function handleCheckoutSuccess(session: any, provider: string) {
   const [existingOrder] = await db()
     .select()
     .from(order)
-    .where(and(eq(order.paymentSessionId, sessionId), isNull(order.deletedAt)))
+    .where(
+      and(
+        eq(order.paymentSessionId, sessionId),
+        eq(order.paymentProvider, provider),
+        isNull(order.deletedAt)
+      )
+    )
     .limit(1);
 
   if (!existingOrder) return;
@@ -738,16 +745,29 @@ export async function settleCheckoutOrder(
     session.paymentStatus === PaymentStatus.FAILED ||
     session.paymentStatus === PaymentStatus.CANCELED
   ) {
+    const result = session.paymentResult;
+    const expired = provider === 'stripe' && result?.status === 'expired';
+    if (
+      expired &&
+      (result.id !== existingOrder.paymentSessionId ||
+        result.payment_status !== 'unpaid' ||
+        result.currency?.toLowerCase() !== existingOrder.currency ||
+        (result.amount_subtotal !== existingOrder.amount &&
+          result.amount_total !== existingOrder.amount))
+    ) {
+      throw new Error('Expired Stripe session does not match the order');
+    }
     await db()
       .update(order)
       .set({
-        status: OrderStatus.FAILED,
+        status: expired ? OrderStatus.EXPIRED : OrderStatus.FAILED,
         paymentResult: JSON.stringify(session.paymentResult),
       })
       .where(
         and(
           eq(order.id, existingOrder.id),
-          inArray(order.status, [OrderStatus.CREATED, OrderStatus.PENDING])
+          inArray(order.status, [OrderStatus.CREATED, OrderStatus.PENDING]),
+          isNull(order.paidAt)
         )
       );
   }

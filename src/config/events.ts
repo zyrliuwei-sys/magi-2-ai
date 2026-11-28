@@ -32,6 +32,8 @@ export const userEvents = {
   // Call track('paywall_hit', { feature }) where a feature needs a paid plan
   // or more credits.
   paywall_hit: { tone: 'amber', client: true },
+  // The browser was handed a checkout link. Payment is recorded from orders.
+  checkout_redirected: { tone: 'amber', client: true },
   // Server only: recordEvent({ userId, kind: 'risk_flagged', detail }).
   risk_flagged: { tone: 'red' },
 } satisfies Record<string, EventDefinition>;

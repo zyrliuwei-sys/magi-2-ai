@@ -50,7 +50,7 @@ const ORDER_STATUSES = [
 ] as const;
 
 // Filter-only: `refunding` is set by an in-flight refund, never by hand.
-const FILTER_STATUSES = [...ORDER_STATUSES, 'refunding'] as const;
+const FILTER_STATUSES = [...ORDER_STATUSES, 'expired', 'refunding'] as const;
 
 interface RefundResult {
   refundStatus: string;

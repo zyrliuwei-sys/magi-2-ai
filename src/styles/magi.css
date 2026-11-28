@@ -495,6 +495,17 @@
   line-height: 1.5;
   color: var(--magi-muted);
 }
+.magi-studio-offer {
+  border: 1px solid var(--magi-line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: var(--magi-field);
+}
+.magi-studio-offer a {
+  color: var(--magi-brass);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .magi-error {
   color: var(--magi-alert);
 }
@@ -904,7 +915,8 @@
   align-self: stretch;
   margin-top: auto;
 }
-.magi-price-card:nth-child(2) {
+.magi-price-card:nth-child(2),
+.magi-price-card[data-selected='true'] {
   border-color: color-mix(in oklab, var(--magi-brass) 55%, var(--magi-line));
 }
 

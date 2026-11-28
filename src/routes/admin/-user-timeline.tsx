@@ -58,6 +58,7 @@ const TONES: Record<string, string> = {
   order_paid: 'bg-primary',
   subscription_started: 'bg-primary',
   order_failed: 'bg-red-500',
+  order_expired: 'bg-muted-foreground',
   order_refunded: 'bg-red-500',
   subscription_canceled: 'bg-red-500',
   task_failed: 'bg-red-500',
@@ -85,6 +86,7 @@ function describe(kind: string, d: Detail): string {
       case 'order_paid':
         return [d.product, money(d.amount, d.currency), d.provider];
       case 'order_failed':
+      case 'order_expired':
         return [d.product, d.orderNo];
       case 'order_refunded':
         return [money(d.amount, d.currency), d.orderNo];

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
+import { getEventDefinition } from '@/config/events';
 import { parseClientEvent, recordEvent } from '@/modules/events/service';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respErr, respOk } from '@/lib/resp';
@@ -9,14 +10,18 @@ import { respErr, respOk } from '@/lib/resp';
 // registered with `client: true` in src/config/events.ts are accepted, for
 // signed-in users, from this site's own pages.
 async function POST({ request }: { request: Request }) {
+  const url = new URL(request.url);
+  const kind = url.searchParams.get('kind');
+  if (kind !== null && getEventDefinition(kind)?.client !== true)
+    return respErr('Invalid event kind', { status: 400 });
   const limited = enforceMinIntervalRateLimit(request, {
     intervalMs: 200,
-    keyPrefix: 'events',
+    keyPrefix: kind ? `events:${kind}` : 'events',
   });
   if (limited) return limited;
 
   const origin = request.headers.get('origin');
-  if (!origin || origin !== new URL(request.url).origin)
+  if (!origin || origin !== url.origin)
     return respErr('Same-origin request required', { status: 403 });
 
   try {
@@ -28,6 +33,8 @@ async function POST({ request }: { request: Request }) {
     const parsed = parseClientEvent(await request.json().catch(() => null));
     if ('error' in parsed)
       return respErr(parsed.error, { status: parsed.status });
+    if (kind !== null && parsed.kind !== kind)
+      return respErr('Event kind mismatch', { status: 400 });
 
     // One event of each kind per user every 2s keeps a looping page (or a
     // script) from flooding the table.
